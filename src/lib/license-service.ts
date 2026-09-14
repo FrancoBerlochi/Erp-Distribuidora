@@ -129,7 +129,7 @@ export function calculateEstimatedPrice(planId: ErpPlanId, selectedModules: ErpM
   }, 0);
 
   // Base del ERP Core (incluido siempre)
-  const coreBaseUSD = 19;
+  const coreBaseUSD = 20;
   return coreBaseUSD + sumAddons;
 }
 
