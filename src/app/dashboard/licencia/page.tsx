@@ -200,7 +200,7 @@ export default function LicenciaDashboardPage() {
           </div>
 
           <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-xs text-gray-500">
-            <span>Core Base (Productos, Inventario y Auth): <strong className="text-emerald-600">Base $20 USD/mes incluida</strong></span>
+            <span>Core Base (Productos, Inventario y Auth): <strong className="text-emerald-600">Base $19 USD/mes incluida</strong></span>
             {license.source === 'storage' && (
               <span className="text-blue-600 font-semibold flex items-center gap-1">
                 <Sparkles className="w-3 h-3" /> Modo Simulación Local Activo
@@ -232,7 +232,7 @@ export default function LicenciaDashboardPage() {
           <div className="mt-6 pt-4 border-t border-gray-800/80 space-y-2 text-xs">
             <div className="flex justify-between text-gray-400">
               <span>Costo Base Core:</span>
-              <span className="font-bold text-white">$20 USD/mes</span>
+              <span className="font-bold text-white">$19 USD/mes</span>
             </div>
             <div className="flex justify-between text-gray-400">
               <span>Módulos adicionales:</span>
