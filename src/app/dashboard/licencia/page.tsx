@@ -36,6 +36,7 @@ import {
   saveSimulatedLicense, 
   resetSimulatedLicense, 
   calculateEstimatedPrice,
+  detectMatchingPlan,
   LicenseState 
 } from '@/lib/license-service';
 import { toast } from 'react-toastify';
@@ -82,7 +83,7 @@ export default function LicenciaDashboardPage() {
       newModules = [...selectedModules, moduleId];
     }
     setSelectedModules(newModules);
-    setSelectedPlan('custom');
+    setSelectedPlan(detectMatchingPlan(newModules));
   };
 
   const handleApplyLicense = () => {

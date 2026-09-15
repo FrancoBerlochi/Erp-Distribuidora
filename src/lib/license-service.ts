@@ -134,6 +134,20 @@ export function calculateEstimatedPrice(planId: ErpPlanId, selectedModules: ErpM
 }
 
 /**
+ * Detecta si la lista de módulos seleccionados coincide exactamente con algún plan predeterminado
+ */
+export function detectMatchingPlan(modules: ErpModuleId[]): ErpPlanId {
+  const sorted = [...modules].sort().join(',');
+  for (const planId of ['enterprise', 'profesional', 'basico'] as ErpPlanId[]) {
+    const planModulesSorted = [...ERP_PLANS[planId].includedModules].sort().join(',');
+    if (sorted === planModulesSorted) {
+      return planId;
+    }
+  }
+  return 'custom';
+}
+
+/**
  * Guarda una licencia simulada en localStorage y cookies (útil para demostraciones en vivo o testing)
  */
 export function saveSimulatedLicense(planId: ErpPlanId, customModules?: ErpModuleId[]): void {
