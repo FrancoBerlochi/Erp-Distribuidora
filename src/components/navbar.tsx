@@ -46,8 +46,8 @@ export default function Navbar() {
   const isOfertasActive = pathname === '/ofertas';
   const isDashboardActive = pathname.startsWith('/dashboard');
 
-  // Ocultar la barra pública en el panel de administración y en la pantalla de login
-  if (isDashboardActive || pathname === '/login') {
+  // Ocultar la barra pública en el panel de administración, en el login y en onboarding
+  if (isDashboardActive || pathname === '/login' || pathname.startsWith('/onboarding')) {
     return null;
   }
 

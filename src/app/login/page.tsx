@@ -222,11 +222,20 @@ function LoginForm() {
             </div>
           </form>
 
-          {/* Información de acceso */}
-          <div className="mt-6 pt-5 border-t border-gray-100 dark:border-gray-800 text-center">
+          {/* Información de acceso y alta de clientes */}
+          <div className="mt-6 pt-5 border-t border-gray-100 dark:border-gray-800 text-center space-y-3">
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Acceso seguro para personal de administración y cajas.
             </p>
+            <div className="pt-2">
+              <Link
+                href="/onboarding"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-blue-700 dark:hover:text-blue-400 transition-colors"
+              >
+                <span>¿Quieres contratar el ERP para tu empresa?</span>
+                <span className="underline">Elige tu Plan y Módulos &rarr;</span>
+              </Link>
+            </div>
           </div>
         </div>
 

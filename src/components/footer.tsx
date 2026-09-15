@@ -6,8 +6,8 @@ import { usePathname } from 'next/navigation';
 export default function Footer() {
   const pathname = usePathname();
 
-  // Ocultar el footer en el panel de administración y en el login
-  if (pathname?.startsWith('/dashboard') || pathname === '/login') {
+  // Ocultar el footer en el panel de administración, en el login y en onboarding
+  if (pathname?.startsWith('/dashboard') || pathname === '/login' || pathname?.startsWith('/onboarding')) {
     return null;
   }
   return (
