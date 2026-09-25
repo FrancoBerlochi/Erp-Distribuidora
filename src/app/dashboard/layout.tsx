@@ -43,6 +43,7 @@ import {
   LicenseState 
 } from '@/lib/license-service';
 import { ERP_PLANS, ERP_MODULES, ErpModuleId } from '@/config/modules';
+import OrdersNotificationBell from '@/components/orders-notification-bell';
 
 export default function DashboardLayout({
   children,
@@ -333,13 +334,16 @@ export default function DashboardLayout({
             ERP <span className="text-[#dc2626] dark:text-red-500">Modular</span>
           </span>
         </div>
-        <button
-          onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-          className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
-          aria-label="Abrir menú"
-        >
-          {mobileSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-2">
+          <OrdersNotificationBell />
+          <button
+            onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+            className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
+            aria-label="Abrir menú"
+          >
+            {mobileSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Backdrop para drawer móvil */}
@@ -381,12 +385,15 @@ export default function DashboardLayout({
               </span>
             </div>
 
-            <button
-              onClick={() => setMobileSidebarOpen(false)}
-              className="md:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <OrdersNotificationBell />
+              <button
+                onClick={() => setMobileSidebarOpen(false)}
+                className="md:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
           <h2 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">
             ERP <span className="text-[#dc2626] dark:text-red-500">Modular</span>
