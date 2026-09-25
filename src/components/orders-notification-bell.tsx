@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { 
   Bell, 
@@ -10,16 +10,16 @@ import {
   Check, 
   Globe, 
   Store, 
-  ExternalLink,
-  ShoppingBag,
-  Sparkles,
-  X
+  ExternalLink, 
+  ShoppingBag, 
+  X,
+  Play
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'react-toastify';
 import { formatCurrency } from '@/lib/formatters';
 
-interface NotificationOrder {
+export interface NotificationOrder {
   id: string;
   orderCode: string;
   customerName: string;
@@ -29,22 +29,22 @@ interface NotificationOrder {
   isRead: boolean;
 }
 
-const STORAGE_KEY = 'erp_orders_notifications';
+const READ_IDS_KEY = 'erp_bell_read_order_ids';
 const SOUND_MUTED_KEY = 'erp_bell_sound_muted';
+const SYNC_EVENT_NAME = 'erp_notifications_synced';
+export const ORDERS_BROADCAST_CHANNEL = 'erp_orders_broadcast_channel';
 
-// Módulo singleton para prevenir doble sonido o doble toast si hay 2 campanas montadas (desktop + mobile)
+// Singleton para prevenir doble sonido o doble toast si hay 2 campanas montadas (desktop + mobile)
 let lastChimePlayedAt = 0;
 let lastToastOrderCode = '';
 let lastToastTime = 0;
-const SYNC_EVENT_NAME = 'erp_notifications_synced';
 
 /**
- * Sintetizador de audio nativo con Web Audio API (Chime agradable de 2 tonos)
- * No requiere descargar archivos .mp3 externos y funciona en cualquier navegador.
+ * Sintetizador de audio nativo con Web Audio API (Chime de 2 tonos)
  */
 function playChimeSound() {
   const now = Date.now();
-  if (now - lastChimePlayedAt < 1000) return; // Prevenir duplicación si hay múltiples campanas montadas
+  if (now - lastChimePlayedAt < 1000) return; // Debounce de 1s
   lastChimePlayedAt = now;
 
   try {
@@ -53,7 +53,7 @@ function playChimeSound() {
     const ctx = new AudioContextClass();
 
     if (ctx.state === 'suspended') {
-      ctx.resume();
+      ctx.resume().catch(() => {});
     }
 
     const t = ctx.currentTime;
@@ -71,7 +71,7 @@ function playChimeSound() {
     osc1.start(t);
     osc1.stop(t + 0.35);
 
-    // Segundo tono (A5 - 880 Hz) más agudo y brillante
+    // Segundo tono (A5 - 880 Hz)
     const osc2 = ctx.createOscillator();
     const gain2 = ctx.createGain();
     osc2.type = 'triangle';
@@ -88,7 +88,25 @@ function playChimeSound() {
   }
 }
 
-export const ORDERS_BROADCAST_CHANNEL = 'erp_orders_broadcast_channel';
+function getStoredReadIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(READ_IDS_KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw));
+  } catch {
+    return new Set();
+  }
+}
+
+function storeReadIds(set: Set<string>) {
+  if (typeof window === 'undefined') return;
+  try {
+    const arr = Array.from(set).slice(-150);
+    localStorage.setItem(READ_IDS_KEY, JSON.stringify(arr));
+    window.dispatchEvent(new CustomEvent(SYNC_EVENT_NAME));
+  } catch {}
+}
 
 export default function OrdersNotificationBell() {
   const [notifications, setNotifications] = useState<NotificationOrder[]>([]);
@@ -97,11 +115,11 @@ export default function OrdersNotificationBell() {
   const [mounted, setMounted] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Registro en memoria de IDs ya procesados para no alertar dos veces por la misma orden
+  // Registro en memoria de órdenes ya conocidas para detectar nuevas llegadas
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
-  const isInitialLoadRef = useRef(true);
+  const isFirstFetchRef = useRef(true);
 
-  // Canal único por instancia del componente para evitar colisiones en Supabase Realtime
+  // Canal único por instancia para Supabase Realtime
   const channelNameRef = useRef<string>(`bell_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`);
   const isMutedRef = useRef(isMuted);
 
@@ -109,54 +127,111 @@ export default function OrdersNotificationBell() {
     isMutedRef.current = isMuted;
   }, [isMuted]);
 
-  // Manejador centralizado y seguro de nueva orden entrante
-  const handleIncomingOrder = (orderData: any, shouldAlert = true) => {
-    if (!orderData) return;
-    const orderId = orderData.id || `ord-${Date.now()}`;
-    if (knownOrderIdsRef.current.has(orderId)) return;
-    knownOrderIdsRef.current.add(orderId);
-
-    const orderCode = (orderData.mp_payment_id || orderData.id || '').slice(-6).toUpperCase();
-    const channelType: 'web' | 'pos' = orderData.channel === 'pos' ? 'pos' : 'web';
-
-    const notifItem: NotificationOrder = {
-      id: orderId,
-      orderCode,
-      customerName: orderData.customer_name || 'Consumidor',
-      channel: channelType,
-      totalAmount: Number(orderData.total_amount) || 0,
-      createdAt: orderData.created_at || new Date().toISOString(),
-      isRead: false,
+  // Desbloqueo del AudioContext en la primera interacción del usuario
+  useEffect(() => {
+    const unlockAudio = () => {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const dummy = new AudioCtx();
+          dummy.resume().then(() => dummy.close());
+        }
+      } catch {}
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
     };
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('keydown', unlockAudio);
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    };
+  }, []);
 
-    setNotifications((prev) => {
-      if (prev.some((n) => n.id === notifItem.id)) return prev;
-      const updated = [notifItem, ...prev].slice(0, 30);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-        window.dispatchEvent(new CustomEvent(SYNC_EVENT_NAME));
-      }
-      return updated;
-    });
+  // Función principal para sincronizar pedidos reales desde Supabase
+  const syncOrdersWithSupabase = useCallback(async (isRealtimeTrigger = false) => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, mp_payment_id, customer_name, channel, total_amount, created_at')
+        .order('created_at', { ascending: false })
+        .limit(25);
 
-    if (shouldAlert) {
-      if (!isMutedRef.current) {
-        playChimeSound();
+      if (error || !data) return;
+
+      const readIds = getStoredReadIds();
+
+      // Mapear órdenes
+      const mappedList: NotificationOrder[] = data.map((o) => {
+        const orderCode = (o.mp_payment_id || o.id || '').slice(-6).toUpperCase();
+        return {
+          id: o.id,
+          orderCode,
+          customerName: o.customer_name || 'Consumidor',
+          channel: o.channel === 'pos' ? 'pos' : 'web',
+          totalAmount: Number(o.total_amount) || 0,
+          createdAt: o.created_at || new Date().toISOString(),
+          isRead: readIds.has(o.id),
+        };
+      });
+
+      // Identificar si hay órdenes nuevas que no conocíamos en memoria
+      const newOrders = data.filter((o) => !knownOrderIdsRef.current.has(o.id));
+
+      if (isFirstFetchRef.current) {
+        // En primera carga:
+        data.forEach((o) => knownOrderIdsRef.current.add(o.id));
+
+        // Si hay una orden reciente (< 5 minutos) y todavía no leída, avisar al usuario
+        const recentUnread = mappedList.find((n) => {
+          const ageMs = Date.now() - new Date(n.createdAt).getTime();
+          return !n.isRead && ageMs < 5 * 60 * 1000;
+        });
+
+        if (recentUnread) {
+          if (!isMutedRef.current) {
+            playChimeSound();
+          }
+          toast.info(
+            `🛎️ ¡Pedido ${recentUnread.channel === 'web' ? 'Web' : 'en Caja'} recibido! #${recentUnread.orderCode} (${formatCurrency(recentUnread.totalAmount)})`,
+            { autoClose: 5000 }
+          );
+        }
+
+        isFirstFetchRef.current = false;
+      } else if (newOrders.length > 0 || isRealtimeTrigger) {
+        // Orden nueva que acaba de llegar durante la sesión
+        const newest = newOrders[0] || data[0];
+        if (newest) {
+          const code = (newest.mp_payment_id || newest.id || '').slice(-6).toUpperCase();
+          const channelType = newest.channel === 'pos' ? 'en Caja' : 'Web';
+          const amt = Number(newest.total_amount) || 0;
+
+          if (!isMutedRef.current) {
+            playChimeSound();
+          }
+
+          const now = Date.now();
+          if (lastToastOrderCode !== code || now - lastToastTime > 2000) {
+            lastToastOrderCode = code;
+            lastToastTime = now;
+            toast.info(
+              `🛎️ ¡Nuevo pedido ${channelType} recibido! #${code} (${formatCurrency(amt)})`,
+              { autoClose: 5000 }
+            );
+          }
+        }
+
+        data.forEach((o) => knownOrderIdsRef.current.add(o.id));
       }
 
-      const now = Date.now();
-      if (lastToastOrderCode !== orderCode || now - lastToastTime > 2000) {
-        lastToastOrderCode = orderCode;
-        lastToastTime = now;
-        toast.info(
-          `🛎️ ¡Nuevo pedido ${channelType === 'web' ? 'Web' : 'en Caja'} recibido! #${orderCode} (${formatCurrency(notifItem.totalAmount)})`,
-          { autoClose: 5000 }
-        );
-      }
+      setNotifications(mappedList);
+    } catch (err) {
+      console.warn('[BELL] Error sincronizando pedidos:', err);
     }
-  };
+  }, []);
 
-  // 1. Cargar preferencias, sincronizar instancias locales y escuchar BroadcastChannel cross-tab
+  // 1. Cargar preferencias y escuchar sincronización entre campanas y BroadcastChannel
   useEffect(() => {
     setMounted(true);
     if (typeof window !== 'undefined') {
@@ -166,32 +241,22 @@ export default function OrdersNotificationBell() {
         isMutedRef.current = true;
       }
 
-      const loadFromStorage = () => {
-        try {
-          const storedNotifs = localStorage.getItem(STORAGE_KEY);
-          if (storedNotifs) {
-            const parsed: NotificationOrder[] = JSON.parse(storedNotifs);
-            setNotifications(parsed);
-            parsed.forEach((n) => knownOrderIdsRef.current.add(n.id));
-          }
-        } catch {}
+      const handleSync = () => {
+        const readIds = getStoredReadIds();
+        setNotifications((prev) =>
+          prev.map((n) => ({ ...n, isRead: readIds.has(n.id) }))
+        );
       };
 
-      loadFromStorage();
-
-      // Sincronizar entre campana móvil y campana desktop en tiempo real
-      const handleSync = () => loadFromStorage();
       window.addEventListener(SYNC_EVENT_NAME, handleSync);
       window.addEventListener('storage', handleSync);
 
-      // Escuchar eventos entre pestañas o módulos
+      // Escuchar eventos entre pestañas
       let broadcast: BroadcastChannel | null = null;
       try {
         broadcast = new BroadcastChannel(ORDERS_BROADCAST_CHANNEL);
-        broadcast.onmessage = (event) => {
-          if (event.data && event.data.order) {
-            handleIncomingOrder(event.data.order, true);
-          }
+        broadcast.onmessage = () => {
+          syncOrdersWithSupabase(true);
         };
       } catch {}
 
@@ -201,56 +266,17 @@ export default function OrdersNotificationBell() {
         if (broadcast) broadcast.close();
       };
     }
-  }, []);
+  }, [syncOrdersWithSupabase]);
 
-  // 2. Consulta inicial y Polling de respaldo cada 8s (Garantiza detección ante cortes de websocket o si Supabase no tiene el table en publication)
+  // 2. Consulta inicial y Polling continuo cada 5 segundos + al cambiar de pestaña
   useEffect(() => {
-    const checkOrdersFromSupabase = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('id, mp_payment_id, customer_name, channel, total_amount, created_at')
-          .order('created_at', { ascending: false })
-          .limit(10);
+    syncOrdersWithSupabase();
 
-        if (error || !data) return;
+    const interval = setInterval(() => {
+      syncOrdersWithSupabase();
+    }, 5000);
 
-        if (isInitialLoadRef.current) {
-          // En primera carga, registrar IDs existentes para no alertar sobre pedidos viejos
-          data.forEach((o) => knownOrderIdsRef.current.add(o.id));
-
-          // Si el estado local estaba vacío, poblar con las órdenes más recientes
-          setNotifications((prev) => {
-            if (prev.length > 0) return prev;
-            return data.map((o) => ({
-              id: o.id,
-              orderCode: (o.mp_payment_id || o.id || '').slice(-6).toUpperCase(),
-              customerName: o.customer_name || 'Consumidor',
-              channel: o.channel === 'pos' ? 'pos' : 'web',
-              totalAmount: Number(o.total_amount) || 0,
-              createdAt: o.created_at || new Date().toISOString(),
-              isRead: true,
-            }));
-          });
-
-          isInitialLoadRef.current = false;
-        } else {
-          // En chequeos posteriores, si hay una orden no registrada, disparar notificación
-          for (const o of data) {
-            if (!knownOrderIdsRef.current.has(o.id)) {
-              handleIncomingOrder(o, true);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('[BELL_POLL] Error verificando pedidos:', err);
-      }
-    };
-
-    checkOrdersFromSupabase();
-
-    const interval = setInterval(checkOrdersFromSupabase, 8000);
-    const handleFocus = () => checkOrdersFromSupabase();
+    const handleFocus = () => syncOrdersWithSupabase();
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleFocus);
 
@@ -259,9 +285,9 @@ export default function OrdersNotificationBell() {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleFocus);
     };
-  }, []);
+  }, [syncOrdersWithSupabase]);
 
-  // 3. Suscripción en tiempo real a la tabla `orders` en Supabase con canal aislado (Sub-segundo)
+  // 3. Suscripción en tiempo real a Supabase (Sub-segundo)
   useEffect(() => {
     const channelName = channelNameRef.current;
     const channel = supabase
@@ -269,10 +295,8 @@ export default function OrdersNotificationBell() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'orders' },
-        (payload) => {
-          const newOrder = payload.new;
-          if (!newOrder) return;
-          handleIncomingOrder(newOrder, true);
+        () => {
+          syncOrdersWithSupabase(true);
         }
       )
       .subscribe();
@@ -280,7 +304,7 @@ export default function OrdersNotificationBell() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [syncOrdersWithSupabase]);
 
   // 4. Cerrar dropdown al hacer clic fuera
   useEffect(() => {
@@ -312,22 +336,26 @@ export default function OrdersNotificationBell() {
     }
   };
 
-  const saveNotifications = (newList: NotificationOrder[]) => {
-    setNotifications(newList);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newList.slice(0, 30)));
-      window.dispatchEvent(new CustomEvent(SYNC_EVENT_NAME));
-    }
+  const handleTestSound = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    playChimeSound();
+    toast.success('🛎️ Timbre de prueba reproducido');
   };
 
   const markAllAsRead = () => {
-    const updated = notifications.map((n) => ({ ...n, isRead: true }));
-    saveNotifications(updated);
+    const readIds = getStoredReadIds();
+    notifications.forEach((n) => readIds.add(n.id));
+    storeReadIds(readIds);
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
   };
 
   const markSingleAsRead = (id: string) => {
-    const updated = notifications.map((n) => (n.id === id ? { ...n, isRead: true } : n));
-    saveNotifications(updated);
+    const readIds = getStoredReadIds();
+    readIds.add(id);
+    storeReadIds(readIds);
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+    );
   };
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -345,7 +373,7 @@ export default function OrdersNotificationBell() {
             : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
         }`}
         aria-label="Notificaciones de pedidos"
-        title={unreadCount > 0 ? `${unreadCount} pedidos nuevos` : 'Sin pedidos pendientes'}
+        title={unreadCount > 0 ? `${unreadCount} pedidos nuevos pendientes` : 'Sin pedidos pendientes'}
       >
         <Bell className={`w-5 h-5 ${unreadCount > 0 ? 'animate-bounce' : ''}`} />
 
@@ -375,6 +403,15 @@ export default function OrdersNotificationBell() {
             </div>
 
             <div className="flex items-center gap-1">
+              {/* Botón Probar Sonido */}
+              <button
+                onClick={handleTestSound}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
+                title="Probar sonido de campana"
+              >
+                <Play className="w-3.5 h-3.5" />
+              </button>
+
               {/* Botón Silenciar / Activar Sonido */}
               <button
                 onClick={toggleMute}
@@ -420,7 +457,7 @@ export default function OrdersNotificationBell() {
                     key={n.id}
                     onClick={() => markSingleAsRead(n.id)}
                     className={`p-3.5 flex items-start gap-3 transition-colors cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/60 ${
-                      !n.isRead ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''
+                      !n.isRead ? 'bg-amber-50/50 dark:bg-amber-950/25' : ''
                     }`}
                   >
                     {/* Badge Canal */}
@@ -451,7 +488,7 @@ export default function OrdersNotificationBell() {
                     </div>
 
                     {!n.isRead && (
-                      <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0 mt-2" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 flex-shrink-0 mt-2 shadow-xs animate-pulse" />
                     )}
                   </div>
                 );
