@@ -562,6 +562,24 @@ export async function executePOSSale(payload: POSSalePayload): Promise<POSSaleRe
   // Invalida la caché del catálogo para que la tienda online refleje el nuevo stock al instante
   invalidateProductsCache();
 
+  // Notificar a las campanas de notificación (Dashboard, etc.) vía BroadcastChannel
+  if (typeof window !== 'undefined') {
+    try {
+      const bc = new BroadcastChannel('erp_orders_broadcast_channel');
+      bc.postMessage({
+        order: {
+          id: finalOrderId,
+          mp_payment_id: `POS-${finalOrderId.slice(-6).toUpperCase()}`,
+          customer_name: payload.customerName || 'Consumidor Final',
+          channel: 'pos',
+          total_amount: totalAmount,
+          created_at: orderDate,
+        },
+      });
+      setTimeout(() => bc.close(), 1000);
+    } catch {}
+  }
+
   return {
     orderId: finalOrderId,
     totalAmount,

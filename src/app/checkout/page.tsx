@@ -87,6 +87,22 @@ export default function CheckoutPage() {
 
       setShowThankYouModal(true);
       clearCart();
+
+      // Notificar inmediatamente a todas las pestañas abiertas (Dashboard, Admin, etc.)
+      try {
+        const bc = new BroadcastChannel('erp_orders_broadcast_channel');
+        bc.postMessage({
+          order: {
+            id: data.orderId,
+            mp_payment_id: data.orderCode,
+            customer_name: formData.name,
+            channel: 'web',
+            total_amount: data.totalAmount,
+            created_at: new Date().toISOString(),
+          },
+        });
+        setTimeout(() => bc.close(), 1000);
+      } catch {}
     } catch (error: any) {
       console.error('Error al procesar compra:', error);
       toast.error(error.message || 'Error procesando el pedido');

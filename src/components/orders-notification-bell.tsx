@@ -88,12 +88,18 @@ function playChimeSound() {
   }
 }
 
+export const ORDERS_BROADCAST_CHANNEL = 'erp_orders_broadcast_channel';
+
 export default function OrdersNotificationBell() {
   const [notifications, setNotifications] = useState<NotificationOrder[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [mounted, setMounted] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Registro en memoria de IDs ya procesados para no alertar dos veces por la misma orden
+  const knownOrderIdsRef = useRef<Set<string>>(new Set());
+  const isInitialLoadRef = useRef(true);
 
   // Canal único por instancia del componente para evitar colisiones en Supabase Realtime
   const channelNameRef = useRef<string>(`bell_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`);
@@ -103,7 +109,54 @@ export default function OrdersNotificationBell() {
     isMutedRef.current = isMuted;
   }, [isMuted]);
 
-  // 1. Cargar preferencias y notificaciones previas + sincronizar entre instancias
+  // Manejador centralizado y seguro de nueva orden entrante
+  const handleIncomingOrder = (orderData: any, shouldAlert = true) => {
+    if (!orderData) return;
+    const orderId = orderData.id || `ord-${Date.now()}`;
+    if (knownOrderIdsRef.current.has(orderId)) return;
+    knownOrderIdsRef.current.add(orderId);
+
+    const orderCode = (orderData.mp_payment_id || orderData.id || '').slice(-6).toUpperCase();
+    const channelType: 'web' | 'pos' = orderData.channel === 'pos' ? 'pos' : 'web';
+
+    const notifItem: NotificationOrder = {
+      id: orderId,
+      orderCode,
+      customerName: orderData.customer_name || 'Consumidor',
+      channel: channelType,
+      totalAmount: Number(orderData.total_amount) || 0,
+      createdAt: orderData.created_at || new Date().toISOString(),
+      isRead: false,
+    };
+
+    setNotifications((prev) => {
+      if (prev.some((n) => n.id === notifItem.id)) return prev;
+      const updated = [notifItem, ...prev].slice(0, 30);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        window.dispatchEvent(new CustomEvent(SYNC_EVENT_NAME));
+      }
+      return updated;
+    });
+
+    if (shouldAlert) {
+      if (!isMutedRef.current) {
+        playChimeSound();
+      }
+
+      const now = Date.now();
+      if (lastToastOrderCode !== orderCode || now - lastToastTime > 2000) {
+        lastToastOrderCode = orderCode;
+        lastToastTime = now;
+        toast.info(
+          `🛎️ ¡Nuevo pedido ${channelType === 'web' ? 'Web' : 'en Caja'} recibido! #${orderCode} (${formatCurrency(notifItem.totalAmount)})`,
+          { autoClose: 5000 }
+        );
+      }
+    }
+  };
+
+  // 1. Cargar preferencias, sincronizar instancias locales y escuchar BroadcastChannel cross-tab
   useEffect(() => {
     setMounted(true);
     if (typeof window !== 'undefined') {
@@ -117,7 +170,9 @@ export default function OrdersNotificationBell() {
         try {
           const storedNotifs = localStorage.getItem(STORAGE_KEY);
           if (storedNotifs) {
-            setNotifications(JSON.parse(storedNotifs));
+            const parsed: NotificationOrder[] = JSON.parse(storedNotifs);
+            setNotifications(parsed);
+            parsed.forEach((n) => knownOrderIdsRef.current.add(n.id));
           }
         } catch {}
       };
@@ -129,23 +184,84 @@ export default function OrdersNotificationBell() {
       window.addEventListener(SYNC_EVENT_NAME, handleSync);
       window.addEventListener('storage', handleSync);
 
+      // Escuchar eventos entre pestañas o módulos
+      let broadcast: BroadcastChannel | null = null;
+      try {
+        broadcast = new BroadcastChannel(ORDERS_BROADCAST_CHANNEL);
+        broadcast.onmessage = (event) => {
+          if (event.data && event.data.order) {
+            handleIncomingOrder(event.data.order, true);
+          }
+        };
+      } catch {}
+
       return () => {
         window.removeEventListener(SYNC_EVENT_NAME, handleSync);
         window.removeEventListener('storage', handleSync);
+        if (broadcast) broadcast.close();
       };
     }
   }, []);
 
-  // 2. Guardar en localStorage al cambiar notificaciones y emitir evento de sincronización
-  const saveNotifications = (newList: NotificationOrder[]) => {
-    setNotifications(newList);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newList.slice(0, 30)));
-      window.dispatchEvent(new CustomEvent(SYNC_EVENT_NAME));
-    }
-  };
+  // 2. Consulta inicial y Polling de respaldo cada 8s (Garantiza detección ante cortes de websocket o si Supabase no tiene el table en publication)
+  useEffect(() => {
+    const checkOrdersFromSupabase = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('id, mp_payment_id, customer_name, channel, total_amount, created_at')
+          .order('created_at', { ascending: false })
+          .limit(10);
 
-  // 3. Suscripción en tiempo real a la tabla `orders` en Supabase con canal aislado
+        if (error || !data) return;
+
+        if (isInitialLoadRef.current) {
+          // En primera carga, registrar IDs existentes para no alertar sobre pedidos viejos
+          data.forEach((o) => knownOrderIdsRef.current.add(o.id));
+
+          // Si el estado local estaba vacío, poblar con las órdenes más recientes
+          setNotifications((prev) => {
+            if (prev.length > 0) return prev;
+            return data.map((o) => ({
+              id: o.id,
+              orderCode: (o.mp_payment_id || o.id || '').slice(-6).toUpperCase(),
+              customerName: o.customer_name || 'Consumidor',
+              channel: o.channel === 'pos' ? 'pos' : 'web',
+              totalAmount: Number(o.total_amount) || 0,
+              createdAt: o.created_at || new Date().toISOString(),
+              isRead: true,
+            }));
+          });
+
+          isInitialLoadRef.current = false;
+        } else {
+          // En chequeos posteriores, si hay una orden no registrada, disparar notificación
+          for (const o of data) {
+            if (!knownOrderIdsRef.current.has(o.id)) {
+              handleIncomingOrder(o, true);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[BELL_POLL] Error verificando pedidos:', err);
+      }
+    };
+
+    checkOrdersFromSupabase();
+
+    const interval = setInterval(checkOrdersFromSupabase, 8000);
+    const handleFocus = () => checkOrdersFromSupabase();
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
+  }, []);
+
+  // 3. Suscripción en tiempo real a la tabla `orders` en Supabase con canal aislado (Sub-segundo)
   useEffect(() => {
     const channelName = channelNameRef.current;
     const channel = supabase
@@ -156,44 +272,7 @@ export default function OrdersNotificationBell() {
         (payload) => {
           const newOrder = payload.new;
           if (!newOrder) return;
-
-          const orderCode = (newOrder.mp_payment_id || newOrder.id || '').slice(-6).toUpperCase();
-          const channelType: 'web' | 'pos' = newOrder.channel === 'pos' ? 'pos' : 'web';
-
-          const notifItem: NotificationOrder = {
-            id: newOrder.id || `ord-${Date.now()}`,
-            orderCode,
-            customerName: newOrder.customer_name || 'Consumidor',
-            channel: channelType,
-            totalAmount: Number(newOrder.total_amount) || 0,
-            createdAt: newOrder.created_at || new Date().toISOString(),
-            isRead: false,
-          };
-
-          setNotifications((prev) => {
-            const updated = [notifItem, ...prev.filter((n) => n.id !== notifItem.id)];
-            if (typeof window !== 'undefined') {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(updated.slice(0, 30)));
-              window.dispatchEvent(new CustomEvent(SYNC_EVENT_NAME));
-            }
-            return updated;
-          });
-
-          // Reproducir sonido si no está silenciado
-          if (!isMutedRef.current) {
-            playChimeSound();
-          }
-
-          // Notificación visual Toast con deduplicación
-          const now = Date.now();
-          if (lastToastOrderCode !== orderCode || now - lastToastTime > 2000) {
-            lastToastOrderCode = orderCode;
-            lastToastTime = now;
-            toast.info(
-              `🛎️ ¡Nuevo pedido ${channelType === 'web' ? 'Web' : 'en Caja'} recibido! #${orderCode} (${formatCurrency(notifItem.totalAmount)})`,
-              { autoClose: 5000 }
-            );
-          }
+          handleIncomingOrder(newOrder, true);
         }
       )
       .subscribe();
@@ -230,6 +309,14 @@ export default function OrdersNotificationBell() {
       toast.success('🔊 Sonido de campana activado');
     } else {
       toast.info('🔇 Sonido de campana silenciado');
+    }
+  };
+
+  const saveNotifications = (newList: NotificationOrder[]) => {
+    setNotifications(newList);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newList.slice(0, 30)));
+      window.dispatchEvent(new CustomEvent(SYNC_EVENT_NAME));
     }
   };
 
