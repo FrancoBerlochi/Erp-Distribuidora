@@ -32,11 +32,21 @@ interface NotificationOrder {
 const STORAGE_KEY = 'erp_orders_notifications';
 const SOUND_MUTED_KEY = 'erp_bell_sound_muted';
 
+// Módulo singleton para prevenir doble sonido o doble toast si hay 2 campanas montadas (desktop + mobile)
+let lastChimePlayedAt = 0;
+let lastToastOrderCode = '';
+let lastToastTime = 0;
+const SYNC_EVENT_NAME = 'erp_notifications_synced';
+
 /**
  * Sintetizador de audio nativo con Web Audio API (Chime agradable de 2 tonos)
  * No requiere descargar archivos .mp3 externos y funciona en cualquier navegador.
  */
 function playChimeSound() {
+  const now = Date.now();
+  if (now - lastChimePlayedAt < 1000) return; // Prevenir duplicación si hay múltiples campanas montadas
+  lastChimePlayedAt = now;
+
   try {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContextClass) return;
@@ -46,33 +56,33 @@ function playChimeSound() {
       ctx.resume();
     }
 
-    const now = ctx.currentTime;
+    const t = ctx.currentTime;
 
     // Primer tono (D5 - 587.33 Hz)
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
     osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(587.33, now);
-    gain1.gain.setValueAtTime(0, now);
-    gain1.gain.linearRampToValueAtTime(0.25, now + 0.05);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    osc1.frequency.setValueAtTime(587.33, t);
+    gain1.gain.setValueAtTime(0, t);
+    gain1.gain.linearRampToValueAtTime(0.25, t + 0.05);
+    gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
     osc1.connect(gain1);
     gain1.connect(ctx.destination);
-    osc1.start(now);
-    osc1.stop(now + 0.35);
+    osc1.start(t);
+    osc1.stop(t + 0.35);
 
     // Segundo tono (A5 - 880 Hz) más agudo y brillante
     const osc2 = ctx.createOscillator();
     const gain2 = ctx.createGain();
     osc2.type = 'triangle';
-    osc2.frequency.setValueAtTime(880, now + 0.12);
-    gain2.gain.setValueAtTime(0, now + 0.12);
-    gain2.gain.linearRampToValueAtTime(0.3, now + 0.16);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+    osc2.frequency.setValueAtTime(880, t + 0.12);
+    gain2.gain.setValueAtTime(0, t + 0.12);
+    gain2.gain.linearRampToValueAtTime(0.3, t + 0.16);
+    gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
     osc2.connect(gain2);
     gain2.connect(ctx.destination);
-    osc2.start(now + 0.12);
-    osc2.stop(now + 0.6);
+    osc2.start(t + 0.12);
+    osc2.stop(t + 0.6);
   } catch (err) {
     console.warn('[BELL_SOUND] No se pudo reproducir el timbre:', err);
   }
@@ -85,34 +95,61 @@ export default function OrdersNotificationBell() {
   const [mounted, setMounted] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // 1. Cargar preferencias y notificaciones previas
+  // Canal único por instancia del componente para evitar colisiones en Supabase Realtime
+  const channelNameRef = useRef<string>(`bell_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`);
+  const isMutedRef = useRef(isMuted);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
+  // 1. Cargar preferencias y notificaciones previas + sincronizar entre instancias
   useEffect(() => {
     setMounted(true);
     if (typeof window !== 'undefined') {
       const storedMuted = localStorage.getItem(SOUND_MUTED_KEY);
-      if (storedMuted === 'true') setIsMuted(true);
+      if (storedMuted === 'true') {
+        setIsMuted(true);
+        isMutedRef.current = true;
+      }
 
-      try {
-        const storedNotifs = localStorage.getItem(STORAGE_KEY);
-        if (storedNotifs) {
-          setNotifications(JSON.parse(storedNotifs));
-        }
-      } catch {}
+      const loadFromStorage = () => {
+        try {
+          const storedNotifs = localStorage.getItem(STORAGE_KEY);
+          if (storedNotifs) {
+            setNotifications(JSON.parse(storedNotifs));
+          }
+        } catch {}
+      };
+
+      loadFromStorage();
+
+      // Sincronizar entre campana móvil y campana desktop en tiempo real
+      const handleSync = () => loadFromStorage();
+      window.addEventListener(SYNC_EVENT_NAME, handleSync);
+      window.addEventListener('storage', handleSync);
+
+      return () => {
+        window.removeEventListener(SYNC_EVENT_NAME, handleSync);
+        window.removeEventListener('storage', handleSync);
+      };
     }
   }, []);
 
-  // 2. Guardar en localStorage al cambiar notificaciones
+  // 2. Guardar en localStorage al cambiar notificaciones y emitir evento de sincronización
   const saveNotifications = (newList: NotificationOrder[]) => {
     setNotifications(newList);
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newList.slice(0, 30)));
+      window.dispatchEvent(new CustomEvent(SYNC_EVENT_NAME));
     }
   };
 
-  // 3. Suscripción en tiempo real a la tabla `orders` en Supabase
+  // 3. Suscripción en tiempo real a la tabla `orders` en Supabase con canal aislado
   useEffect(() => {
+    const channelName = channelNameRef.current;
     const channel = supabase
-      .channel('realtime_bell_notifications')
+      .channel(channelName)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'orders' },
@@ -137,20 +174,26 @@ export default function OrdersNotificationBell() {
             const updated = [notifItem, ...prev.filter((n) => n.id !== notifItem.id)];
             if (typeof window !== 'undefined') {
               localStorage.setItem(STORAGE_KEY, JSON.stringify(updated.slice(0, 30)));
+              window.dispatchEvent(new CustomEvent(SYNC_EVENT_NAME));
             }
             return updated;
           });
 
           // Reproducir sonido si no está silenciado
-          if (!isMuted) {
+          if (!isMutedRef.current) {
             playChimeSound();
           }
 
-          // Notificación visual Toast
-          toast.info(
-            `🛎️ ¡Nuevo pedido ${channelType === 'web' ? 'Web' : 'en Caja'} recibido! #${orderCode} (${formatCurrency(notifItem.totalAmount)})`,
-            { autoClose: 5000 }
-          );
+          // Notificación visual Toast con deduplicación
+          const now = Date.now();
+          if (lastToastOrderCode !== orderCode || now - lastToastTime > 2000) {
+            lastToastOrderCode = orderCode;
+            lastToastTime = now;
+            toast.info(
+              `🛎️ ¡Nuevo pedido ${channelType === 'web' ? 'Web' : 'en Caja'} recibido! #${orderCode} (${formatCurrency(notifItem.totalAmount)})`,
+              { autoClose: 5000 }
+            );
+          }
         }
       )
       .subscribe();
@@ -158,7 +201,7 @@ export default function OrdersNotificationBell() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isMuted]);
+  }, []);
 
   // 4. Cerrar dropdown al hacer clic fuera
   useEffect(() => {
