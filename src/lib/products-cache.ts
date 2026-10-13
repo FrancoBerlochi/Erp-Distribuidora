@@ -94,7 +94,7 @@ export function optimizeImageUrl(url: string | null | undefined, width = 500): s
 }
 
 // Helper con timeout para evitar que una petición de Supabase se quede colgada indefinidamente
-function withTimeout<T = any>(promise: Promise<T>, ms: number = 3000): Promise<T> {
+function withTimeout<T = any>(promise: Promise<T>, ms: number = 8000): Promise<T> {
   let timer: any;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
@@ -108,11 +108,15 @@ function withTimeout<T = any>(promise: Promise<T>, ms: number = 3000): Promise<T
 
 // Fetch directo vía REST HTTP nativo de PostgREST (bypassea cualquier deadlock del cliente Supabase)
 async function fetchViaRestApi(endpointParams: string): Promise<any[]> {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error('Variables de entorno NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY no configuradas en .env.local');
+  }
+
   const url = `${SUPABASE_URL}/rest/v1/products?${endpointParams}`;
   console.log(`[DISTRIBUIDORA-REST] 🌐 Petición directa a Supabase REST...`);
   
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 4500);
+  const timer = setTimeout(() => controller.abort(), 8000);
 
   try {
     const res = await fetch(url, {
@@ -126,7 +130,8 @@ async function fetchViaRestApi(endpointParams: string): Promise<any[]> {
     clearTimeout(timer);
 
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      const errText = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status}: ${res.statusText} ${errText ? `(${errText})` : ''}`);
     }
     const data = await res.json();
     console.log(`[DISTRIBUIDORA-REST] ✅ Éxito REST: ${Array.isArray(data) ? data.length : 0} productos recibidos.`);
@@ -138,6 +143,28 @@ async function fetchViaRestApi(endpointParams: string): Promise<any[]> {
   }
 }
 
+// Fetch de respaldo a través del servidor Next.js (/api/products)
+// Esto bypassea problemas de DNS del cliente (ERR_NAME_NOT_RESOLVED), bloqueos de ISP y adblockers
+async function fetchViaInternalApi(type: 'all' | 'admin' | 'discounted'): Promise<any[]> {
+  if (typeof window === 'undefined') return [];
+  try {
+    console.log(`[DISTRIBUIDORA-INTERNAL] 🛡️ Fallback a API interna (/api/products?type=${type})...`);
+    const res = await fetch(`/api/products?type=${type}`);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      console.log(`[DISTRIBUIDORA-INTERNAL] ✅ Éxito vía API interna: ${data.length} productos recibidos.`);
+      return data;
+    }
+  } catch (err: any) {
+    console.warn(`[DISTRIBUIDORA-INTERNAL] ⚠️ Falló petición a API interna:`, err?.message);
+  }
+  return [];
+}
+
+
 // Fetchers con estrategia dual (Supabase SDK + Fallback REST Directo)
 async function fetchAllProducts(): Promise<any[]> {
   console.log('[DISTRIBUIDORA] 🚀 Iniciando fetchAllProducts (stock > 0)...');
@@ -145,6 +172,8 @@ async function fetchAllProducts(): Promise<any[]> {
   if (local) {
     console.log(`[DISTRIBUIDORA] 💾 Cache local encontrada: ${local.length} productos.`);
   }
+
+  let lastError: string | null = null;
 
   // 1. Intentar SDK Supabase
   try {
@@ -156,7 +185,7 @@ async function fetchAllProducts(): Promise<any[]> {
         .select(cols)
         .gt('stock', 0)
         .order('created_at', { ascending: false }) as any,
-      3000
+      8000
     );
 
     // Si falló por columna faltante (error 42703), degradar a base
@@ -169,7 +198,32 @@ async function fetchAllProducts(): Promise<any[]> {
           .select(PRODUCT_COLUMNS_BASE)
           .gt('stock', 0)
           .order('created_at', { ascending: false }) as any,
-        3000
+        8000
+      );
+    }
+
+    // Si aún falla por columnas base faltantes, degradar a '*'
+    if (res.error && (res.error.code === '42703' || res.error.message?.includes('column'))) {
+      console.warn('[DISTRIBUIDORA] ⚠️ Reintentando con select("*")...');
+      res = await withTimeout(
+        supabase
+          .from('products')
+          .select('*')
+          .gt('stock', 0)
+          .order('created_at', { ascending: false }) as any,
+        8000
+      );
+    }
+
+    // Si falla por created_at no existente
+    if (res.error && (res.error.code === '42703' || res.error.message?.includes('column'))) {
+      console.warn('[DISTRIBUIDORA] ⚠️ Reintentando select("*") sin orden created_at...');
+      res = await withTimeout(
+        supabase
+          .from('products')
+          .select('*')
+          .gt('stock', 0) as any,
+        8000
       );
     }
 
@@ -181,9 +235,11 @@ async function fetchAllProducts(): Promise<any[]> {
       return res.data;
     }
     if (res.error) {
-      console.warn(`[DISTRIBUIDORA] ⚠️ Supabase SDK retornó error:`, res.error.message);
+      lastError = res.error.message || `Error de base de datos (${res.error.code})`;
+      console.warn(`[DISTRIBUIDORA] ⚠️ Supabase SDK retornó error:`, lastError);
     }
   } catch (err: any) {
+    lastError = err.message;
     console.warn(`[DISTRIBUIDORA] ⚠️ SDK demoró o falló (${err.message}). Recurriendo a REST directo...`);
   }
 
@@ -198,7 +254,12 @@ async function fetchAllProducts(): Promise<any[]> {
       if (cols !== PRODUCT_COLUMNS_BASE) {
         fallbackToBaseColumns();
         params = `select=${encodeURIComponent(PRODUCT_COLUMNS_BASE)}&stock=gt.0&order=created_at.desc`;
-        restData = await fetchViaRestApi(params);
+        try {
+          restData = await fetchViaRestApi(params);
+        } catch {
+          params = `select=*&stock=gt.0`;
+          restData = await fetchViaRestApi(params);
+        }
       }
     }
 
@@ -207,13 +268,28 @@ async function fetchAllProducts(): Promise<any[]> {
       return restData;
     }
   } catch (err: any) {
+    lastError = err.message || lastError;
     console.error(`[DISTRIBUIDORA] ❌ Falló también REST directo en fetchAllProducts:`, err.message);
   }
+
+  // 3. Fallback a API interna (/api/products) ante problemas de DNS (ERR_NAME_NOT_RESOLVED) en el cliente
+  try {
+    const internalData = await fetchViaInternalApi('all');
+    if (Array.isArray(internalData) && internalData.length > 0) {
+      setSavedCache(CACHE_KEYS.ALL_PRODUCTS, internalData);
+      return internalData;
+    }
+  } catch {}
 
   if (local && Array.isArray(local) && local.length > 0) {
     console.log(`[DISTRIBUIDORA] 🛡️ Usando caché previa de localStorage (${local.length} items).`);
     return local;
   }
+
+  if (lastError && (!SUPABASE_URL || !SUPABASE_ANON_KEY)) {
+    throw new Error('Configuración de Supabase no encontrada. Agrega NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY en tu archivo .env.local');
+  }
+
   return [];
 }
 
@@ -223,6 +299,8 @@ async function fetchDiscountedProducts(): Promise<any[]> {
   if (local) {
     console.log(`[DISTRIBUIDORA] 💾 Cache local ofertas: ${local.length} productos.`);
   }
+
+  let lastError: string | null = null;
 
   // 1. Intentar SDK Supabase
   try {
@@ -235,7 +313,7 @@ async function fetchDiscountedProducts(): Promise<any[]> {
         .gt('stock', 0)
         .gt('discount_percentage', 0)
         .order('discount_percentage', { ascending: false }) as any,
-      3000
+      8000
     );
 
     if (res.error && (res.error.code === '42703' || res.error.message?.includes('column'))) {
@@ -247,7 +325,18 @@ async function fetchDiscountedProducts(): Promise<any[]> {
           .gt('stock', 0)
           .gt('discount_percentage', 0)
           .order('discount_percentage', { ascending: false }) as any,
-        3000
+        8000
+      );
+    }
+
+    if (res.error && (res.error.code === '42703' || res.error.message?.includes('column'))) {
+      res = await withTimeout(
+        supabase
+          .from('products')
+          .select('*')
+          .gt('stock', 0)
+          .gt('discount_percentage', 0) as any,
+        8000
       );
     }
 
@@ -259,9 +348,11 @@ async function fetchDiscountedProducts(): Promise<any[]> {
       return res.data;
     }
     if (res.error) {
+      lastError = res.error.message;
       console.warn(`[DISTRIBUIDORA] ⚠️ Supabase SDK ofertas error:`, res.error.message);
     }
   } catch (err: any) {
+    lastError = err.message;
     console.warn(`[DISTRIBUIDORA] ⚠️ SDK ofertas demoró (${err.message}). Probando REST directo...`);
   }
 
@@ -276,7 +367,12 @@ async function fetchDiscountedProducts(): Promise<any[]> {
       if (cols !== PRODUCT_COLUMNS_BASE) {
         fallbackToBaseColumns();
         params = `select=${encodeURIComponent(PRODUCT_COLUMNS_BASE)}&stock=gt.0&discount_percentage=gt.0&order=discount_percentage.desc`;
-        restData = await fetchViaRestApi(params);
+        try {
+          restData = await fetchViaRestApi(params);
+        } catch {
+          params = `select=*&stock=gt.0&discount_percentage=gt.0`;
+          restData = await fetchViaRestApi(params);
+        }
       }
     }
 
@@ -285,8 +381,18 @@ async function fetchDiscountedProducts(): Promise<any[]> {
       return restData;
     }
   } catch (err: any) {
+    lastError = err.message || lastError;
     console.error(`[DISTRIBUIDORA] ❌ Falló REST ofertas:`, err.message);
   }
+
+  // 3. Fallback a API interna (/api/products)
+  try {
+    const internalData = await fetchViaInternalApi('discounted');
+    if (Array.isArray(internalData) && internalData.length > 0) {
+      setSavedCache(CACHE_KEYS.DISCOUNTED_PRODUCTS, internalData);
+      return internalData;
+    }
+  } catch {}
 
   if (local && Array.isArray(local) && local.length > 0) {
     return local;
@@ -301,6 +407,8 @@ async function fetchAdminProducts(): Promise<any[]> {
     console.log(`[DISTRIBUIDORA] 💾 Cache local admin: ${local.length} productos.`);
   }
 
+  let lastError: string | null = null;
+
   // 1. Intentar SDK Supabase
   try {
     const t0 = Date.now();
@@ -310,7 +418,7 @@ async function fetchAdminProducts(): Promise<any[]> {
         .from('products')
         .select(cols)
         .order('created_at', { ascending: false }) as any,
-      3000
+      8000
     );
 
     if (res.error && (res.error.code === '42703' || res.error.message?.includes('column'))) {
@@ -321,7 +429,28 @@ async function fetchAdminProducts(): Promise<any[]> {
           .from('products')
           .select(PRODUCT_COLUMNS_BASE)
           .order('created_at', { ascending: false }) as any,
-        3000
+        8000
+      );
+    }
+
+    if (res.error && (res.error.code === '42703' || res.error.message?.includes('column'))) {
+      console.warn('[DISTRIBUIDORA] ⚠️ Reintentando admin con select("*")...');
+      res = await withTimeout(
+        supabase
+          .from('products')
+          .select('*')
+          .order('created_at', { ascending: false }) as any,
+        8000
+      );
+    }
+
+    if (res.error && (res.error.code === '42703' || res.error.message?.includes('column'))) {
+      console.warn('[DISTRIBUIDORA] ⚠️ Reintentando admin con select("*") sin orden created_at...');
+      res = await withTimeout(
+        supabase
+          .from('products')
+          .select('*') as any,
+        8000
       );
     }
 
@@ -333,9 +462,11 @@ async function fetchAdminProducts(): Promise<any[]> {
       return res.data;
     }
     if (res.error) {
-      console.warn(`[DISTRIBUIDORA] ⚠️ Supabase SDK admin error:`, res.error.message);
+      lastError = res.error.message || `Error de base de datos (${res.error.code})`;
+      console.warn(`[DISTRIBUIDORA] ⚠️ Supabase SDK admin error:`, lastError);
     }
   } catch (err: any) {
+    lastError = err.message;
     console.warn(`[DISTRIBUIDORA] ⚠️ SDK admin demoró o falló (${err.message}). Recurriendo a REST directo...`);
   }
 
@@ -350,7 +481,12 @@ async function fetchAdminProducts(): Promise<any[]> {
       if (cols !== PRODUCT_COLUMNS_BASE) {
         fallbackToBaseColumns();
         params = `select=${encodeURIComponent(PRODUCT_COLUMNS_BASE)}&order=created_at.desc`;
-        restData = await fetchViaRestApi(params);
+        try {
+          restData = await fetchViaRestApi(params);
+        } catch {
+          params = `select=*`;
+          restData = await fetchViaRestApi(params);
+        }
       }
     }
 
@@ -359,12 +495,31 @@ async function fetchAdminProducts(): Promise<any[]> {
       return restData;
     }
   } catch (err: any) {
+    lastError = err.message || lastError;
     console.error(`[DISTRIBUIDORA] ❌ Falló REST admin:`, err.message);
   }
+
+  // 3. Fallback a API interna (/api/products) ante problemas de resolución DNS
+  try {
+    const internalData = await fetchViaInternalApi('admin');
+    if (Array.isArray(internalData) && internalData.length > 0) {
+      setSavedCache(CACHE_KEYS.ADMIN_PRODUCTS, internalData);
+      return internalData;
+    }
+  } catch {}
 
   if (local && Array.isArray(local) && local.length > 0) {
     console.log(`[DISTRIBUIDORA] 🛡️ Usando caché local admin (${local.length} productos).`);
     return local;
+  }
+
+  if (lastError && (!SUPABASE_URL || !SUPABASE_ANON_KEY)) {
+    throw new Error('Configuración de Supabase no encontrada. Agrega NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY en tu archivo .env.local');
+  }
+
+  if (lastError) {
+    console.warn('[DISTRIBUIDORA] ⚠️ No se pudieron obtener productos para admin:', lastError);
+    throw new Error(lastError);
   }
 
   console.warn('[DISTRIBUIDORA] ⚠️ No se pudieron obtener productos para admin ni por red ni por caché.');
@@ -402,10 +557,25 @@ export async function forceDirectProductsFetch(type: 'admin' | 'all' | 'discount
       } else {
         params = `select=${encodeURIComponent(PRODUCT_COLUMNS_BASE)}&order=created_at.desc`;
       }
-      data = await fetchViaRestApi(params);
+      try {
+        data = await fetchViaRestApi(params);
+      } catch {
+        params = type === 'all' ? `select=*&stock=gt.0` : type === 'discounted' ? `select=*&stock=gt.0&discount_percentage=gt.0` : `select=*`;
+        data = await fetchViaRestApi(params);
+      }
     } else {
-      data = [];
+      params = `select=*`;
+      data = await fetchViaRestApi(params);
     }
+  }
+
+  if (!Array.isArray(data) || data.length === 0) {
+    try {
+      const internalData = await fetchViaInternalApi(type);
+      if (Array.isArray(internalData) && internalData.length > 0) {
+        data = internalData;
+      }
+    } catch {}
   }
 
   if (Array.isArray(data)) {
