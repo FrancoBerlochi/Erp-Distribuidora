@@ -51,87 +51,89 @@ export default function CartPage() {
             const hasWholesaleOffer = Boolean(item.wholesale_price && Number(item.wholesale_price) > 0);
 
             return (
-              <div key={item.id} className="bg-white dark:bg-gray-900 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 flex items-center gap-4">
-                <div className="w-20 h-20 bg-gray-50 dark:bg-gray-800/60 rounded-lg overflow-hidden flex-shrink-0">
-                  {item.image_url ? (
-                    <img src={item.image_url} alt={item.name} className="w-full h-full object-contain" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs text-gray-500 dark:text-gray-400">Sin img</div>
-                  )}
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-gray-900 dark:text-white truncate text-base">{item.name}</h3>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <p className={`font-bold ${isWholesale ? 'text-emerald-600 dark:text-emerald-400 font-extrabold text-base' : promoCalc?.isPromoActive ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-primary dark:text-blue-400'}`}>
-                      ${unitPrice.toFixed(2)} c/u
-                    </p>
-                    {(isWholesale || (promoCalc && promoCalc.isPromoActive)) && (
-                      <span className="text-xs text-gray-400 line-through">
-                        ${(item.price * item.quantity / item.quantity).toFixed(2)}
+              <div key={item.id} className="bg-white dark:bg-gray-900 p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-50 dark:bg-gray-800/60 rounded-lg overflow-hidden flex-shrink-0">
+                    {item.image_url ? (
+                      <img src={item.image_url} alt={item.name} className="w-full h-full object-contain" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-500 dark:text-gray-400">Sin img</div>
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-gray-900 dark:text-white truncate text-base">{item.name}</h3>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className={`font-bold ${isWholesale ? 'text-emerald-600 dark:text-emerald-400 font-extrabold text-base' : promoCalc?.isPromoActive ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-primary dark:text-blue-400'}`}>
+                        ${unitPrice.toFixed(2)} c/u
+                      </p>
+                      {(isWholesale || (promoCalc && promoCalc.isPromoActive)) && (
+                        <span className="text-xs text-gray-400 line-through">
+                          ${(item.price * item.quantity / item.quantity).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+
+                    {isWholesale && (
+                      <span className="text-[10px] text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 font-black border border-emerald-200 dark:border-emerald-800 mt-1">
+                        <Zap className="w-3 h-3 text-emerald-600" /> ¡Precio Mayorista aplicado! (x{minWholesaleQty}+ u.)
+                      </span>
+                    )}
+
+                    {!isWholesale && promoCalc?.isPromoActive && (
+                      <span className="text-[10px] text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/80 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 font-black border border-amber-300 dark:border-amber-700 mt-1">
+                        <Gift className="w-3 h-3 text-amber-600" /> {promoCalc.appliedDescription} (Ahorrás -${promoCalc.discountAmount.toFixed(2)})
+                      </span>
+                    )}
+
+                    {!isWholesale && promoCalc && !promoCalc.isPromoActive && promoCalc.promoBadge && (
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium mt-1 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-amber-500" />
+                        {promoCalc.promoBadge.description}
+                      </p>
+                    )}
+
+                    {!isWholesale && !promoCalc?.isPromoActive && hasWholesaleOffer && (
+                      <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-emerald-500" />
+                        Llevando {minWholesaleQty - item.quantity} más, pagás <strong className="font-bold font-mono">${Number(item.wholesale_price).toFixed(2)} c/u</strong>
+                      </p>
+                    )}
+
+                    {!isWholesale && !promoCalc?.isPromoActive && item.discount_percentage > 0 && (
+                      <span className="text-xs text-secondary bg-red-50 dark:bg-red-900/30 px-2.5 py-0.5 rounded-full inline-block mt-1 font-bold border border-red-100 dark:border-red-900/40">
+                        -{item.discount_percentage}% aplicado
                       </span>
                     )}
                   </div>
-
-                  {isWholesale && (
-                    <span className="text-[10px] text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 font-black border border-emerald-200 dark:border-emerald-800 mt-1">
-                      <Zap className="w-3 h-3 text-emerald-600" /> ¡Precio Mayorista aplicado! (x{minWholesaleQty}+ u.)
-                    </span>
-                  )}
-
-                  {!isWholesale && promoCalc?.isPromoActive && (
-                    <span className="text-[10px] text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/80 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 font-black border border-amber-300 dark:border-amber-700 mt-1">
-                      <Gift className="w-3 h-3 text-amber-600" /> {promoCalc.appliedDescription} (Ahorrás -${promoCalc.discountAmount.toFixed(2)})
-                    </span>
-                  )}
-
-                  {!isWholesale && promoCalc && !promoCalc.isPromoActive && promoCalc.promoBadge && (
-                    <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium mt-1 flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-amber-500" />
-                      {promoCalc.promoBadge.description}
-                    </p>
-                  )}
-
-                  {!isWholesale && !promoCalc?.isPromoActive && hasWholesaleOffer && (
-                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-emerald-500" />
-                      Llevando {minWholesaleQty - item.quantity} más, pagás <strong className="font-bold font-mono">${Number(item.wholesale_price).toFixed(2)} c/u</strong>
-                    </p>
-                  )}
-
-                  {!isWholesale && !promoCalc?.isPromoActive && item.discount_percentage > 0 && (
-                    <span className="text-xs text-secondary bg-red-50 dark:bg-red-900/30 px-2.5 py-0.5 rounded-full inline-block mt-1 font-bold border border-red-100 dark:border-red-900/40">
-                      -{item.discount_percentage}% aplicado
-                    </span>
-                  )}
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between sm:justify-end gap-3 pt-3 sm:pt-0 border-t border-gray-100 dark:border-gray-800 sm:border-0">
                   <div className="flex items-center border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50">
                     <button 
                       onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      className="p-2 text-gray-700 hover:text-primary dark:text-gray-300 dark:hover:text-primary disabled:opacity-40 transition-colors"
+                      className="p-1.5 sm:p-2 text-gray-700 hover:text-primary dark:text-gray-300 dark:hover:text-primary disabled:opacity-40 transition-colors"
                       disabled={item.quantity <= 1}
                     >
                       <Minus className="w-4 h-4" />
                     </button>
-                    <span className="w-8 text-center font-bold text-gray-900 dark:text-white">{item.quantity}</span>
+                    <span className="w-7 sm:w-8 text-center font-bold text-gray-900 dark:text-white text-sm sm:text-base">{item.quantity}</span>
                     <button 
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      className="p-2 text-gray-700 hover:text-primary dark:text-gray-300 dark:hover:text-primary disabled:opacity-40 transition-colors"
+                      className="p-1.5 sm:p-2 text-gray-700 hover:text-primary dark:text-gray-300 dark:hover:text-primary disabled:opacity-40 transition-colors"
                       disabled={item.quantity >= item.stock}
                     >
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
                   
-                  <div className="w-24 text-right font-extrabold text-gray-900 dark:text-white text-lg">
+                  <div className="text-right font-extrabold text-gray-900 dark:text-white text-base sm:text-lg sm:w-24">
                     ${lineTotal.toFixed(2)}
                   </div>
 
                   <button 
                     onClick={() => removeItem(item.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors ml-2"
+                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors ml-1 sm:ml-2"
                   >
                     <Trash2 className="w-5 h-5" />
                   </button>

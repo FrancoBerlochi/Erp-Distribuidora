@@ -153,7 +153,7 @@ export default function RentabilidadPage() {
       </div>
 
       {/* SELECTOR DE PERÍODO */}
-      <div className="flex bg-gray-100 dark:bg-gray-800/60 p-1 rounded-2xl gap-1 max-w-md">
+      <div className="flex bg-gray-100 dark:bg-gray-800/60 p-1 rounded-2xl gap-1 max-w-md overflow-x-auto scrollbar-none">
         {[
           { id: 'today', label: 'Hoy (Turno)' },
           { id: '7days', label: 'Últimos 7 Días' },
@@ -163,7 +163,7 @@ export default function RentabilidadPage() {
           <button
             key={btn.id}
             onClick={() => setPeriod(btn.id as PeriodFilter)}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-black transition-all ${
+            className={`flex-1 min-w-[95px] whitespace-nowrap py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer ${
               period === btn.id
                 ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-xs'
                 : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'

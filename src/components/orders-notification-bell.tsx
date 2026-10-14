@@ -108,7 +108,11 @@ function storeReadIds(set: Set<string>) {
   } catch {}
 }
 
-export default function OrdersNotificationBell() {
+interface OrdersNotificationBellProps {
+  align?: 'left' | 'right';
+}
+
+export default function OrdersNotificationBell({ align = 'right' }: OrdersNotificationBellProps) {
   const [notifications, setNotifications] = useState<NotificationOrder[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -306,18 +310,27 @@ export default function OrdersNotificationBell() {
     };
   }, [syncOrdersWithSupabase]);
 
-  // 4. Cerrar dropdown al hacer clic fuera
+  // 4. Cerrar dropdown al hacer clic fuera o presionar Escape
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
         setIsOpen(false);
       }
     }
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+      window.addEventListener('keydown', handleKeyDown);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen]);
 
@@ -387,130 +400,153 @@ export default function OrdersNotificationBell() {
 
       {/* Popover / Menú Desplegable */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-          {/* Cabecera del Dropdown */}
-          <div className="p-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gray-50/70 dark:bg-gray-800/40">
-            <div className="flex items-center gap-2">
-              <Bell className="w-4 h-4 text-primary" />
-              <span className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-wider">
-                Pedidos Recientes
-              </span>
-              {unreadCount > 0 && (
-                <span className="text-[10px] font-bold bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">
-                  {unreadCount} nuevos
+        <>
+          {/* Backdrop oscurecido para mobile (permite cerrar tocando afuera) */}
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-2xs z-[65] md:hidden animate-in fade-in duration-200"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsOpen(false);
+            }}
+          />
+
+          <div 
+            className={`
+              fixed left-3 right-3 top-16 max-w-md mx-auto z-[70] max-h-[82vh]
+              md:absolute md:inset-x-auto md:mx-0 md:max-w-none md:max-h-none md:z-50 md:top-full md:mt-2 md:w-96
+              ${align === 'left' ? 'md:left-0 md:right-auto' : 'md:right-0 md:left-auto'}
+              rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-2xl overflow-hidden flex flex-col
+              animate-in fade-in zoom-in-95 duration-150
+            `}
+          >
+            {/* Cabecera del Dropdown */}
+            <div className="p-3.5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-gray-50/70 dark:bg-gray-800/40 flex-shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <Bell className="w-4 h-4 text-primary flex-shrink-0" />
+                <span className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-wider truncate">
+                  Pedidos Recientes
                 </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-1">
-              {/* Botón Probar Sonido */}
-              <button
-                onClick={handleTestSound}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
-                title="Probar sonido de campana"
-              >
-                <Play className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Botón Silenciar / Activar Sonido */}
-              <button
-                onClick={toggleMute}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
-                title={isMuted ? 'Activar sonido de campana' : 'Silenciar sonido'}
-              >
-                {isMuted ? <VolumeX className="w-4 h-4 text-red-500" /> : <Volume2 className="w-4 h-4 text-emerald-500" />}
-              </button>
-
-              {/* Marcar todas como leídas */}
-              {unreadCount > 0 && (
-                <button
-                  onClick={markAllAsRead}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
-                  title="Marcar todas como leídas"
-                >
-                  <Check className="w-4 h-4" />
-                </button>
-              )}
-
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Listado de Notificaciones */}
-          <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
-            {notifications.length === 0 ? (
-              <div className="p-8 text-center text-gray-400 dark:text-gray-500 space-y-2">
-                <ShoppingBag className="w-8 h-8 mx-auto stroke-1" />
-                <p className="text-xs font-medium">No hay notificaciones de pedidos recientes.</p>
-                <p className="text-[10px]">Cuando ingrese una venta web o en caja, sonará y aparecerá aquí.</p>
+                {unreadCount > 0 && (
+                  <span className="text-[10px] font-bold bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full flex-shrink-0">
+                    {unreadCount} {unreadCount === 1 ? 'nuevo' : 'nuevos'}
+                  </span>
+                )}
               </div>
-            ) : (
-              notifications.map((n) => {
-                const timeAgo = formatTimeAgo(n.createdAt);
-                return (
-                  <div
-                    key={n.id}
-                    onClick={() => markSingleAsRead(n.id)}
-                    className={`p-3.5 flex items-start gap-3 transition-colors cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/60 ${
-                      !n.isRead ? 'bg-amber-50/50 dark:bg-amber-950/25' : ''
-                    }`}
+
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {/* Botón Probar Sonido */}
+                <button
+                  onClick={handleTestSound}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer active:scale-95 transition-all"
+                  title="Probar sonido de campana"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Botón Silenciar / Activar Sonido */}
+                <button
+                  onClick={toggleMute}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer active:scale-95 transition-all"
+                  title={isMuted ? 'Activar sonido de campana' : 'Silenciar sonido'}
+                >
+                  {isMuted ? <VolumeX className="w-4 h-4 text-red-500" /> : <Volume2 className="w-4 h-4 text-emerald-500" />}
+                </button>
+
+                {/* Marcar todas como leídas */}
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllAsRead}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-primary hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer active:scale-95 transition-all"
+                    title="Marcar todas como leídas"
                   >
-                    {/* Badge Canal */}
-                    <div className={`mt-0.5 p-2 rounded-xl flex-shrink-0 ${
-                      n.channel === 'web'
-                        ? 'bg-blue-100 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400'
-                        : 'bg-purple-100 dark:bg-purple-950/70 text-purple-600 dark:text-purple-400'
-                    }`}>
-                      {n.channel === 'web' ? <Globe className="w-4 h-4" /> : <Store className="w-4 h-4" />}
-                    </div>
+                    <Check className="w-4 h-4" />
+                  </button>
+                )}
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-extrabold text-gray-900 dark:text-white truncate">
-                          #{n.orderCode} &bull; {n.customerName}
-                        </span>
-                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0">
-                          {formatCurrency(n.totalAmount)}
-                        </span>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer active:scale-95 transition-all"
+                  aria-label="Cerrar notificaciones"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Listado de Notificaciones */}
+            <div className="max-h-[55vh] md:max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 flex-1">
+              {notifications.length === 0 ? (
+                <div className="p-8 text-center text-gray-400 dark:text-gray-500 space-y-2">
+                  <ShoppingBag className="w-8 h-8 mx-auto stroke-1" />
+                  <p className="text-xs font-medium">No hay notificaciones de pedidos recientes.</p>
+                  <p className="text-[10px]">Cuando ingrese una venta web o en caja, sonará y aparecerá aquí.</p>
+                </div>
+              ) : (
+                notifications.map((n) => {
+                  const timeAgo = formatTimeAgo(n.createdAt);
+                  return (
+                    <div
+                      key={n.id}
+                      onClick={() => markSingleAsRead(n.id)}
+                      className={`p-3.5 flex items-start gap-3 transition-colors cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/60 active:bg-gray-100 dark:active:bg-gray-800 ${
+                        !n.isRead ? 'bg-amber-50/50 dark:bg-amber-950/25' : ''
+                      }`}
+                    >
+                      {/* Badge Canal */}
+                      <div className={`mt-0.5 p-2 rounded-xl flex-shrink-0 ${
+                        n.channel === 'web'
+                          ? 'bg-blue-100 dark:bg-blue-950/70 text-blue-600 dark:text-blue-400'
+                          : 'bg-purple-100 dark:bg-purple-950/70 text-purple-600 dark:text-purple-400'
+                      }`}>
+                        {n.channel === 'web' ? <Globe className="w-4 h-4" /> : <Store className="w-4 h-4" />}
                       </div>
 
-                      <div className="flex items-center justify-between text-[10px] text-gray-400 mt-1">
-                        <span className="flex items-center gap-1">
-                          {n.channel === 'web' ? 'Pedido Tienda Online' : 'Venta Mostrador POS'}
-                        </span>
-                        <span>{timeAgo}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-extrabold text-gray-900 dark:text-white truncate">
+                            #{n.orderCode} &bull; {n.customerName}
+                          </span>
+                          <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400 flex-shrink-0">
+                            {formatCurrency(n.totalAmount)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px] text-gray-400 mt-1">
+                          <span className="flex items-center gap-1 truncate">
+                            {n.channel === 'web' ? 'Pedido Tienda Online' : 'Venta Mostrador POS'}
+                          </span>
+                          <span className="flex-shrink-0 ml-2">{timeAgo}</span>
+                        </div>
                       </div>
+
+                      {!n.isRead && (
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 flex-shrink-0 mt-2 shadow-xs animate-pulse" />
+                      )}
                     </div>
+                  );
+                })
+              )}
+            </div>
 
-                    {!n.isRead && (
-                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 flex-shrink-0 mt-2 shadow-xs animate-pulse" />
-                    )}
-                  </div>
-                );
-              })
-            )}
+            {/* Pie de Popover con enlace al Dashboard */}
+            <div className="p-2.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 text-center flex-shrink-0">
+              <Link
+                href="/dashboard"
+                onClick={() => {
+                  setIsOpen(false);
+                  markAllAsRead();
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('erp_close_mobile_sidebar'));
+                  }
+                }}
+                className="inline-flex items-center justify-center gap-1.5 w-full py-1 text-xs font-bold text-primary hover:text-blue-700 dark:hover:text-blue-400 transition-colors"
+              >
+                <span>Ver todos los pedidos en el Pipeline</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
-
-          {/* Pie de Popover con enlace al Dashboard */}
-          <div className="p-2.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 text-center">
-            <Link
-              href="/dashboard"
-              onClick={() => {
-                setIsOpen(false);
-                markAllAsRead();
-              }}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:text-blue-700 dark:hover:text-blue-400 transition-colors"
-            >
-              <span>Ver todos los pedidos en el Pipeline</span>
-              <ExternalLink className="w-3 h-3" />
-            </Link>
-          </div>
-        </div>
+        </>
       )}
     </div>
   );

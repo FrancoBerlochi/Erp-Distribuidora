@@ -583,12 +583,12 @@ export default function DashboardOrdersPage() {
 
         {/* Sub-barra con Canales y Buscador */}
         <div className="p-3.5 border-b border-gray-200 dark:border-gray-800 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white dark:bg-gray-900 flex-shrink-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none w-full md:w-auto pb-1 md:pb-0">
             {/* Selector de Canales */}
-            <div className="inline-flex p-0.5 bg-gray-100 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <div className="inline-flex p-0.5 bg-gray-100 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shrink-0">
               <button
                 onClick={() => setChannelFilter('all')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   channelFilter === 'all'
                     ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-xs'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -598,7 +598,7 @@ export default function DashboardOrdersPage() {
               </button>
               <button
                 onClick={() => setChannelFilter('web')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap ${
                   channelFilter === 'web'
                     ? 'bg-white dark:bg-gray-900 text-sky-600 dark:text-sky-400 shadow-xs'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -608,7 +608,7 @@ export default function DashboardOrdersPage() {
               </button>
               <button
                 onClick={() => setChannelFilter('pos')}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap ${
                   channelFilter === 'pos'
                     ? 'bg-white dark:bg-gray-900 text-purple-600 dark:text-purple-400 shadow-xs'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -808,7 +808,7 @@ export default function DashboardOrdersPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {/* Paso 1: Recibido */}
                     {(() => {
                       const isDone = ['preparing', 'ready_pickup', 'in_delivery', 'delivered', 'accepted'].includes(selectedOrder.status);

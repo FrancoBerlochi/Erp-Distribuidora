@@ -28,6 +28,7 @@ import {
   Package,
   Layers,
   ArrowLeft,
+  ArrowRight,
   X,
   Users,
   UserCheck,
@@ -81,6 +82,7 @@ export default function POSPage() {
   const [priceListMode, setPriceListMode] = useState<'minorista' | 'mayorista'>('minorista');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [mobileTab, setMobileTab] = useState<'catalog' | 'cart'>('catalog');
 
   // Estados de Escáner y Modales
   const [cameraModalOpen, setCameraModalOpen] = useState(false);
@@ -449,6 +451,7 @@ export default function POSPage() {
 
       setLastSaleResult(result);
       setCart([]);
+      setMobileTab('catalog');
       setChargeModalOpen(false);
       setReceiptModalOpen(true);
       setCreditPaidNowStr('');
@@ -562,10 +565,45 @@ export default function POSPage() {
         </div>
       </header>
 
+      {/* Selector de pestañas móvil (< lg) */}
+      <div className="lg:hidden flex border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => setMobileTab('catalog')}
+          className={`flex-1 py-2.5 text-xs font-black flex items-center justify-center gap-2 border-b-2 transition-all cursor-pointer ${
+            mobileTab === 'catalog'
+              ? 'border-[#dc2626] text-[#dc2626]'
+              : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          <Package className="w-4 h-4" />
+          <span>Catálogo ({filteredProducts.length})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab('cart')}
+          className={`flex-1 py-2.5 text-xs font-black flex items-center justify-center gap-2 border-b-2 transition-all relative cursor-pointer ${
+            mobileTab === 'cart'
+              ? 'border-[#dc2626] text-[#dc2626]'
+              : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          <ShoppingCart className="w-4 h-4" />
+          <span>Ticket ({cart.reduce((acc, it) => acc + it.quantity, 0)})</span>
+          {cart.length > 0 && (
+            <span className="bg-[#dc2626] text-white text-[10px] font-black px-1.5 py-0.5 rounded-full ml-1">
+              {formatMoney(totalPayable)}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* 2. CONTENIDO PRINCIPAL: GRILLA IZQUIERDA + CARRITO DERECHO */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
         {/* COLUMNA IZQUIERDA: BUSCADOR + CATEGORÍAS + GRILLA DE PRODUCTOS */}
-        <div className="flex-1 flex flex-col min-h-0 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 space-y-3">
+        <div className={`flex-1 flex flex-col min-h-0 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 space-y-3 ${
+          mobileTab === 'catalog' ? 'flex' : 'hidden lg:flex'
+        }`}>
           {/* Buscador y Botón de Cámara */}
           <div className="flex items-center gap-2 shrink-0">
             <div className="relative flex-1">
@@ -723,13 +761,47 @@ export default function POSPage() {
               </div>
             )}
           </div>
+
+          {/* Barra Flotante Inferior en Móvil con acceso rápido al Ticket */}
+          {cart.length > 0 && (
+            <div className="lg:hidden shrink-0 pt-2 pb-1 border-t border-gray-200 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={() => setMobileTab('cart')}
+                className="w-full bg-[#dc2626] hover:bg-red-700 text-white p-3 rounded-2xl flex items-center justify-between shadow-lg active:scale-98 transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5" />
+                  <span className="text-xs font-black">
+                    {cart.reduce((acc, it) => acc + it.quantity, 0)} {cart.reduce((acc, it) => acc + it.quantity, 0) === 1 ? 'ítem' : 'ítems'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-black">{formatMoney(totalPayable)}</span>
+                  <span className="text-xs bg-white/25 px-2 py-0.5 rounded-lg font-bold flex items-center gap-1">
+                    Ver Ticket <ArrowRight className="w-3.5 h-3.5" />
+                  </span>
+                </div>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* COLUMNA DERECHA: CANASTA DE VENTA TÁCTIL (TICKET EN PROCESO) */}
-        <div className="w-full lg:w-96 xl:w-[420px] bg-white dark:bg-gray-900 flex flex-col shrink-0 min-h-0 border-t lg:border-t-0">
+        <div className={`w-full lg:w-96 xl:w-[420px] bg-white dark:bg-gray-900 flex-col shrink-0 min-h-0 border-t lg:border-t-0 ${
+          mobileTab === 'cart' ? 'flex flex-1' : 'hidden lg:flex'
+        }`}>
           {/* Cabecera Canasta */}
           <div className="p-3.5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setMobileTab('catalog')}
+                className="lg:hidden p-1.5 -ml-1 text-gray-500 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                title="Volver al Catálogo"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
               <ShoppingCart className="w-4 h-4 text-[#dc2626]" />
               <h2 className="font-extrabold text-sm text-gray-900 dark:text-white">
                 Ticket Actual ({cart.reduce((acc, it) => acc + it.quantity, 0)})

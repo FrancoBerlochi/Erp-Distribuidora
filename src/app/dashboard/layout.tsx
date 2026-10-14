@@ -139,10 +139,16 @@ export default function DashboardLayout({
     };
   }, [pathname, router]);
 
-  // Cerrar sidebar móvil al cambiar de ruta
+  // Cerrar sidebar móvil al cambiar de ruta o evento personalizado
   useEffect(() => {
     setMobileSidebarOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    const handleCloseSidebar = () => setMobileSidebarOpen(false);
+    window.addEventListener('erp_close_mobile_sidebar', handleCloseSidebar);
+    return () => window.removeEventListener('erp_close_mobile_sidebar', handleCloseSidebar);
+  }, []);
 
   // Evitar cualquier scroll exterior en la ventana/body en todo el panel
   useEffect(() => {
@@ -347,7 +353,7 @@ export default function DashboardLayout({
             <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
             <span>Tour</span>
           </button>
-          <OrdersNotificationBell />
+          <OrdersNotificationBell align="right" />
           <button
             onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
             className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
@@ -398,7 +404,7 @@ export default function DashboardLayout({
             </div>
 
             <div className="flex items-center gap-1.5">
-              <OrdersNotificationBell />
+              <OrdersNotificationBell align="left" />
               <button
                 onClick={() => setMobileSidebarOpen(false)}
                 className="md:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"

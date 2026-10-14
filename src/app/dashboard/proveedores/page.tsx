@@ -1000,7 +1000,7 @@ export default function ProveedoresPage() {
             </div>
 
             {/* Tabla de Artículos del Pedido */}
-            <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+            <div className="border border-gray-200 dark:border-gray-800 rounded-xl overflow-x-auto">
               {orderItems.length === 0 ? (
                 <div className="p-8 text-center text-gray-400">
                   <Boxes className="w-10 h-10 mx-auto mb-2 text-gray-300 dark:text-gray-600" />
@@ -1625,7 +1625,7 @@ export default function ProveedoresPage() {
               </button>
             </div>
 
-            <div className="overflow-y-auto flex-1 border border-gray-200 dark:border-gray-800 rounded-xl">
+            <div className="overflow-auto flex-1 border border-gray-200 dark:border-gray-800 rounded-xl">
               <table className="w-full text-left text-sm">
                 <thead className="bg-gray-50 dark:bg-gray-800/60 text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider sticky top-0">
                   <tr>

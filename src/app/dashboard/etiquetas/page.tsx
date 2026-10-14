@@ -592,7 +592,7 @@ export default function EtiquetasPage() {
       {/* CUERPO PRINCIPAL: SELECTOR DE PRODUCTOS + VISTA PREVIA (NO-PRINT) */}
       <div className="no-print grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* COLUMNA IZQUIERDA: LISTA Y SELECTOR DE PRODUCTOS (5 COLS) */}
-        <div className="lg:col-span-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-4 space-y-4 flex flex-col h-[750px]">
+        <div className="lg:col-span-5 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-4 space-y-4 flex flex-col h-[480px] sm:h-[600px] lg:h-[750px]">
           <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-gray-800">
             <div>
               <h4 className="font-bold text-gray-900 dark:text-white text-sm">
@@ -778,7 +778,7 @@ export default function EtiquetasPage() {
         </div>
 
         {/* COLUMNA DERECHA: VISTA PREVIA INTERACTIVA (7 COLS) */}
-        <div className="lg:col-span-7 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-4 space-y-4 flex flex-col h-[750px]">
+        <div className="lg:col-span-7 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-4 space-y-4 flex flex-col h-[520px] sm:h-[600px] lg:h-[750px]">
           <div className="flex items-center justify-between pb-2 border-b border-gray-100 dark:border-gray-800">
             <div>
               <h4 className="font-bold text-gray-900 dark:text-white text-sm flex items-center gap-2">
@@ -803,7 +803,7 @@ export default function EtiquetasPage() {
           </div>
 
           {/* Contenedor de Hoja con Scroll */}
-          <div className="flex-1 overflow-y-auto bg-gray-100 dark:bg-gray-950 p-4 rounded-xl border border-gray-200 dark:border-gray-800 flex justify-center">
+          <div className="flex-1 overflow-auto bg-gray-100 dark:bg-gray-950 p-2 sm:p-4 rounded-xl border border-gray-200 dark:border-gray-800 flex justify-center">
             {totalLabelsCount === 0 ? (
               <div className="m-auto text-center text-gray-400 p-8">
                 <Tag className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
