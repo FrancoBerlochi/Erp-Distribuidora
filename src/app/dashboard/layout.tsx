@@ -30,7 +30,9 @@ import {
   Database,
   CalendarClock,
   Sliders,
-  Lock
+  Lock,
+  Sparkles,
+  ChevronRight
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
@@ -44,6 +46,7 @@ import {
 } from '@/lib/license-service';
 import { ERP_PLANS, ERP_MODULES, ErpModuleId } from '@/config/modules';
 import OrdersNotificationBell from '@/components/orders-notification-bell';
+import { useErpTourStore } from '@/lib/tour-store';
 
 export default function DashboardLayout({
   children,
@@ -53,6 +56,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
+  const openTour = useErpTourStore((state) => state.openTour);
   const [mounted, setMounted] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -335,6 +339,14 @@ export default function DashboardLayout({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => openTour()}
+            className="px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-primary dark:text-blue-400 text-xs font-black flex items-center gap-1 cursor-pointer active:scale-95 transition-all shadow-2xs"
+            title="Abrir Tour Guiado del ERP"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+            <span>Tour</span>
+          </button>
           <OrdersNotificationBell />
           <button
             onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
@@ -405,6 +417,33 @@ export default function DashboardLayout({
         
         {/* Navegación principal con filtrado por rol y módulos activos */}
         <nav className="flex-1 p-4 lg:p-5 space-y-2.5 overflow-y-auto min-h-0">
+          {/* Botón Destacado: Tour Guiado del ERP */}
+          <button
+            onClick={() => {
+              setMobileSidebarOpen(false);
+              openTour();
+            }}
+            className="w-full mb-3 p-3.5 rounded-2xl bg-gradient-to-br from-blue-600 via-primary to-indigo-700 text-white font-black text-xs flex items-center justify-between shadow-md shadow-primary/25 hover:shadow-lg hover:scale-[1.01] active:scale-95 transition-all cursor-pointer group text-left"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center flex-shrink-0 shadow-inner">
+                <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-black leading-tight flex items-center gap-1.5">
+                  <span>Tour Guiado del ERP</span>
+                  <span className="text-[9px] bg-amber-400 text-black px-1.5 py-0.2 rounded-full font-black uppercase">
+                    Demo
+                  </span>
+                </div>
+                <div className="text-[11px] text-blue-100 font-medium truncate mt-0.5">
+                  Conocé el sistema paso a paso
+                </div>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-white/70 group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
+          </button>
+
           <div className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 mb-2 flex items-center justify-between">
             <span>Módulos Habilitados</span>
             {currentRole === 'cajero' && (

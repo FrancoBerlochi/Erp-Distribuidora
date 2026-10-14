@@ -5,12 +5,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingCart, Moon, Sun, Menu, X, Flame, Home, LayoutDashboard, Phone, Mail, Package } from 'lucide-react';
+import { ShoppingCart, Moon, Sun, Menu, X, Flame, Home, LayoutDashboard, Phone, Mail, Package, Sparkles } from 'lucide-react';
 import { useCartStore } from '@/lib/store';
+import { useErpTourStore } from '@/lib/tour-store';
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
 
 export default function Navbar() {
+  const openTour = useErpTourStore((state) => state.openTour);
   const items = useCartStore((state) => state.items);
   const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -101,6 +103,16 @@ export default function Navbar() {
 
           {/* Acciones de la derecha */}
           <div className="flex items-center gap-3">
+            {/* Solo en Desktop: Botón Tour del ERP */}
+            <button
+              onClick={() => openTour()}
+              className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-xs hover:shadow transition-all cursor-pointer"
+              title="Abrir Tour Guiado del ERP"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+              <span>Tour ERP</span>
+            </button>
+
             {/* Solo en Desktop: Enlace Admin */}
             <Link
               href="/dashboard"
@@ -229,6 +241,23 @@ export default function Navbar() {
                 <LayoutDashboard className="w-5 h-5" />
                 <span>Panel de Admin</span>
               </Link>
+
+              {/* Tour Guiado ERP (Mobile) */}
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  openTour();
+                }}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-all cursor-pointer text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <Sparkles className="w-5 h-5 text-amber-500 animate-pulse" />
+                  <span>Tour Guiado del ERP</span>
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-blue-600 text-white px-2 py-0.5 rounded-full">
+                  Demo
+                </span>
+              </button>
             </nav>
 
             {/* Sección Inferior del Drawer */}

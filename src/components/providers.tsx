@@ -3,11 +3,13 @@
 import { ThemeProvider } from 'next-themes';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import ErpGuidedTour from '@/components/erp-guided-tour';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       {children}
+      <ErpGuidedTour />
       <ToastContainer 
         position="bottom-right"
         autoClose={3000}

@@ -9,7 +9,8 @@ import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/lib/store';
 import { useProducts, optimizeImageUrl } from '@/lib/products-cache';
 import { toast } from 'react-toastify';
-import { X, Flame, ShoppingCart, Plus, Minus, ArrowRight, Package } from 'lucide-react';
+import { X, Flame, ShoppingCart, Plus, Minus, ArrowRight, Package, Sparkles } from 'lucide-react';
+import { useErpTourStore } from '@/lib/tour-store';
 import BannerCarousel from '@/components/banner-carousel';
 import CategoryShowcaseSection from '@/components/category-showcase-section';
 import BestSellersSection from '@/components/best-sellers-section';
@@ -20,6 +21,7 @@ export default function Home() {
   const [selectedProduct, setSelectedProduct] = useState<any>(null); // State for modal
   const [modalQuantity, setModalQuantity] = useState<number>(1);
   const addItem = useCartStore(state => state.addItem);
+  const openTour = useErpTourStore(state => state.openTour);
 
   const handleAddToCart = (product: any, e?: React.MouseEvent, qty: number = 1) => {
     if (e) e.stopPropagation();
@@ -78,6 +80,13 @@ export default function Home() {
                 <Flame className="w-5 h-5 fill-white animate-pulse" />
                 Ver Ofertas
               </Link>
+              <button
+                onClick={() => openTour()}
+                className="bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/30 text-white font-bold px-6 py-3 rounded-full transition-all shadow-lg flex items-center gap-2 transform hover:scale-105 cursor-pointer"
+              >
+                <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
+                <span>Tour Guiado del ERP</span>
+              </button>
             </div>
           </div>
         </div>
