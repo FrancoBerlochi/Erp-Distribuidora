@@ -232,11 +232,11 @@ export default function BulkPriceModal({
             <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
               Redondeo de Precios
             </label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <button
                 type="button"
                 onClick={() => setRoundTo('none')}
-                className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   roundTo === 'none'
                     ? 'bg-primary text-white shadow-xs'
                     : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
@@ -247,7 +247,7 @@ export default function BulkPriceModal({
               <button
                 type="button"
                 onClick={() => setRoundTo('10')}
-                className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   roundTo === '10'
                     ? 'bg-primary text-white shadow-xs'
                     : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
@@ -258,7 +258,7 @@ export default function BulkPriceModal({
               <button
                 type="button"
                 onClick={() => setRoundTo('50')}
-                className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   roundTo === '50'
                     ? 'bg-primary text-white shadow-xs'
                     : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
@@ -269,7 +269,7 @@ export default function BulkPriceModal({
               <button
                 type="button"
                 onClick={() => setRoundTo('100')}
-                className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`py-2 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   roundTo === '100'
                     ? 'bg-primary text-white shadow-xs'
                     : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
@@ -307,7 +307,7 @@ export default function BulkPriceModal({
                   const newP = calculateNewPrice(currentP);
                   return (
                     <div key={p.id} className="flex justify-between items-center text-xs pt-1.5 first:pt-0">
-                      <span className="truncate max-w-[240px] text-gray-800 dark:text-gray-200 font-medium">
+                      <span className="truncate max-w-[130px] sm:max-w-[240px] text-gray-800 dark:text-gray-200 font-medium">
                         {p.name}
                       </span>
                       <div className="flex items-center gap-2 flex-shrink-0 font-mono">
@@ -323,12 +323,12 @@ export default function BulkPriceModal({
         </div>
 
         {/* Footer y Botones de Acción */}
-        <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 flex justify-end gap-3">
+        <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 flex flex-col-reverse sm:flex-row justify-end gap-2.5 sm:gap-3">
           <button
             type="button"
             onClick={onClose}
             disabled={isUpdating}
-            className="px-4 py-2 text-xs font-bold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+            className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer text-center"
           >
             Cancelar
           </button>
@@ -336,7 +336,7 @@ export default function BulkPriceModal({
             type="button"
             onClick={handleApplyAdjustment}
             disabled={isUpdating || targetProducts.length === 0}
-            className="px-5 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-sm transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+            className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
           >
             {isUpdating ? (
               <>

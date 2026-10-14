@@ -959,7 +959,7 @@ export default function ClientesPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
                   <label className="text-[11px] font-bold text-gray-500 block mb-1">Tipo Doc:</label>
                   <select
@@ -972,7 +972,7 @@ export default function ClientesPage() {
                     <option value="CUIL">CUIL</option>
                   </select>
                 </div>
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label className="text-[11px] font-bold text-gray-500 block mb-1">Número de Documento:</label>
                   <input
                     type="text"
@@ -984,7 +984,7 @@ export default function ClientesPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-[11px] font-bold text-gray-500 block mb-1">Teléfono (WhatsApp):</label>
                   <input
@@ -1018,7 +1018,7 @@ export default function ClientesPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-[11px] font-bold text-gray-500 block mb-1">Límite de Crédito ($):</label>
                   <input

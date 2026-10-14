@@ -800,18 +800,18 @@ export default function VencimientosPage() {
               </div>
 
               {/* Botones de Envío */}
-              <div className="pt-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2">
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-800 flex flex-col-reverse sm:flex-row items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsNewBatchModalOpen(false)}
-                  className="px-4 py-2 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors cursor-pointer text-center"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingBatch}
-                  className="px-5 py-2 text-xs font-black bg-primary text-white hover:bg-blue-700 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                  className="w-full sm:w-auto px-5 py-2 text-xs font-black bg-primary text-white hover:bg-blue-700 rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   {savingBatch ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                   <span>Guardar Lote</span>
@@ -890,18 +890,18 @@ export default function VencimientosPage() {
                 ⚠️ Esta acción descontará las unidades de este lote y del stock general del producto, y registrará un movimiento de auditoría Kardex de tipo <strong>waste</strong>.
               </div>
 
-              <div className="pt-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-gray-200 dark:border-gray-800 flex flex-col-reverse sm:flex-row items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedBatchForWaste(null)}
-                  className="px-4 py-2 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors cursor-pointer text-center"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingWaste}
-                  className="px-5 py-2 text-xs font-black bg-rose-600 text-white hover:bg-rose-700 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                  className="w-full sm:w-auto px-5 py-2 text-xs font-black bg-rose-600 text-white hover:bg-rose-700 rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   {savingWaste ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                   <span>Confirmar Merma</span>
@@ -977,18 +977,18 @@ export default function VencimientosPage() {
                 </span>
               </div>
 
-              <div className="pt-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-gray-200 dark:border-gray-800 flex flex-col-reverse sm:flex-row items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedBatchForPromo(null)}
-                  className="px-4 py-2 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors cursor-pointer text-center"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingPromo}
-                  className="px-5 py-2 text-xs font-black bg-amber-600 text-white hover:bg-amber-700 rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                  className="w-full sm:w-auto px-5 py-2 text-xs font-black bg-amber-600 text-white hover:bg-amber-700 rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   {savingPromo ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                   <span>Aplicar Oferta</span>

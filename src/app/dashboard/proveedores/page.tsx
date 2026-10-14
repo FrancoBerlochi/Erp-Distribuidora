@@ -1456,22 +1456,22 @@ export default function ProveedoresPage() {
       {/* MODAL: ALTA / EDICIÓN DE PROVEEDOR                                        */}
       {/* ========================================================================= */}
       {supplierModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-lg w-full p-6 border border-gray-200 dark:border-gray-800 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-3">
-              <h3 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-gray-900 rounded-3xl max-w-lg w-full border border-gray-200 dark:border-gray-800 shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between shrink-0 bg-gray-50/50 dark:bg-gray-800/40">
+              <h3 className="font-bold text-base sm:text-lg text-gray-900 dark:text-white flex items-center gap-2">
                 <Truck className="w-5 h-5 text-blue-600" />
                 {supplierToEdit?.id ? 'Editar Proveedor' : 'Registrar Nuevo Proveedor'}
               </h3>
               <button
                 onClick={() => setSupplierModalOpen(false)}
-                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveSupplier} className="space-y-3">
+            <form onSubmit={handleSaveSupplier} className="p-4 sm:p-6 overflow-y-auto space-y-3.5 flex-1">
               <div>
                 <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 block mb-1">
                   Nombre o Razón Social *
@@ -1482,11 +1482,11 @@ export default function ProveedoresPage() {
                   value={supplierToEdit?.name || ''}
                   onChange={(e) => setSupplierToEdit({ ...supplierToEdit, name: e.target.value })}
                   placeholder="Ej: Arcor Distribución S.A."
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 block mb-1">
                     CUIT (Opcional)
@@ -1513,7 +1513,7 @@ export default function ProveedoresPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 block mb-1">
                     Vendedor o Preventista
@@ -1540,7 +1540,7 @@ export default function ProveedoresPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 block mb-1">
                     Email
@@ -1580,18 +1580,18 @@ export default function ProveedoresPage() {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-gray-200 dark:border-gray-800">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t border-gray-200 dark:border-gray-800">
                 <button
                   type="button"
                   onClick={() => setSupplierModalOpen(false)}
-                  className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl"
+                  className="w-full sm:w-auto px-4 py-2.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl font-bold cursor-pointer transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingSupplier}
-                  className="px-5 py-2 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow transition-all disabled:opacity-50"
+                  className="w-full sm:w-auto px-5 py-2.5 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {savingSupplier ? 'Guardando...' : 'Guardar Proveedor'}
                 </button>

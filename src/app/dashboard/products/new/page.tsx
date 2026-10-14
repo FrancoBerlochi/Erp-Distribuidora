@@ -135,19 +135,42 @@ export default function NewProductPage() {
         }
       }
 
+      const isColumnError = (err: any) =>
+        err && (
+          err.code === '42703' ||
+          err.code === 'PGRST204' ||
+          err.message?.includes('schema cache') ||
+          err.message?.includes('column') ||
+          err.details?.includes('column')
+        );
+
       // Insertar en Supabase (con fallback defensivo ante columnas pendientes)
       let { error } = await supabase.from('products').insert([productPayload]);
-      if (error && error.code === '42703') {
-        delete productPayload.min_stock;
-        delete productPayload.supplier_name;
+
+      if (isColumnError(error)) {
+        console.warn('Error de esquema en Supabase al crear producto, reintentando sin columnas de promociones...', error);
         delete productPayload.promo_type;
         delete productPayload.promo_second_unit_discount;
         delete productPayload.promo_min_qty;
         delete productPayload.promo_discount_percentage;
-        delete productPayload.wholesale_price;
-        delete productPayload.wholesale_min_qty;
+
         const retry = await supabase.from('products').insert([productPayload]);
         error = retry.error;
+
+        if (isColumnError(error)) {
+          delete productPayload.min_stock;
+          delete productPayload.supplier_name;
+          const retry2 = await supabase.from('products').insert([productPayload]);
+          error = retry2.error;
+
+          if (isColumnError(error)) {
+            delete productPayload.cost_price;
+            delete productPayload.wholesale_price;
+            delete productPayload.wholesale_min_qty;
+            const retry3 = await supabase.from('products').insert([productPayload]);
+            error = retry3.error;
+          }
+        }
       }
 
       if (error) throw error;
@@ -172,17 +195,17 @@ export default function NewProductPage() {
   });
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="flex items-center gap-4 mb-6">
+    <div className="max-w-2xl mx-auto px-1 sm:px-0">
+      <div className="flex items-center gap-3 sm:gap-4 mb-5 sm:mb-6">
         <Link href="/dashboard/products" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
-          <ArrowLeft className="w-6 h-6" />
+          <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
         </Link>
-        <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">Nuevo Producto</h1>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">Nuevo Producto</h1>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
+        <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div className="col-span-2">
               <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">Nombre del Producto *</label>
               <input 
@@ -594,7 +617,7 @@ export default function NewProductPage() {
             <button 
               type="submit" 
               disabled={loading}
-              className="bg-primary text-white px-6 py-2 rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50"
+              className="w-full sm:w-auto bg-primary text-white px-8 py-3 rounded-xl font-bold hover:bg-primary/90 disabled:opacity-50 shadow-md hover:shadow-lg transition-all cursor-pointer"
             >
               {loading ? 'Guardando...' : 'Guardar Producto'}
             </button>

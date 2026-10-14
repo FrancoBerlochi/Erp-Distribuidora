@@ -189,26 +189,57 @@ export default function EditProductPage() {
           : null,
       };
 
+      const isColumnError = (err: any) =>
+        err && (
+          err.code === '42703' ||
+          err.code === 'PGRST204' ||
+          err.message?.includes('schema cache') ||
+          err.message?.includes('column') ||
+          err.details?.includes('column')
+        );
+
       let { error } = await supabase
         .from('products')
         .update(updatePayload)
         .eq('id', params.id);
 
-      if (error && error.code === '42703') {
-        delete updatePayload.min_stock;
-        delete updatePayload.supplier_name;
+      // Si falla porque faltan columnas en Supabase (ej: promo_discount_percentage u otras de promociones)
+      if (isColumnError(error)) {
+        console.warn('Error de esquema en Supabase, reintentando sin columnas de promociones para preservar precio mayorista...', error);
+        // Retiramos primero SOLO las columnas de promociones
         delete updatePayload.promo_type;
         delete updatePayload.promo_second_unit_discount;
         delete updatePayload.promo_min_qty;
         delete updatePayload.promo_discount_percentage;
-        delete updatePayload.cost_price;
-        delete updatePayload.wholesale_price;
-        delete updatePayload.wholesale_min_qty;
+
         const retry = await supabase
           .from('products')
           .update(updatePayload)
           .eq('id', params.id);
         error = retry.error;
+
+        // Si aún falla, retirar también columnas accesorias de proveedores o stock mínimo
+        if (isColumnError(error)) {
+          delete updatePayload.min_stock;
+          delete updatePayload.supplier_name;
+          const retry2 = await supabase
+            .from('products')
+            .update(updatePayload)
+            .eq('id', params.id);
+          error = retry2.error;
+
+          // Último recurso en caso de que la tabla no tenga wholesale_price o cost_price
+          if (isColumnError(error)) {
+            delete updatePayload.cost_price;
+            delete updatePayload.wholesale_price;
+            delete updatePayload.wholesale_min_qty;
+            const retry3 = await supabase
+              .from('products')
+              .update(updatePayload)
+              .eq('id', params.id);
+            error = retry3.error;
+          }
+        }
       }
 
       if (error) throw error;
@@ -235,17 +266,17 @@ export default function EditProductPage() {
   if (loading) return <div className="p-8 text-center">Cargando producto...</div>;
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="flex items-center gap-4 mb-6">
+    <div className="max-w-2xl mx-auto px-1 sm:px-0">
+      <div className="flex items-center gap-3 sm:gap-4 mb-5 sm:mb-6">
         <Link href="/dashboard/products" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
-          <ArrowLeft className="w-6 h-6" />
+          <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
         </Link>
-        <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">Editar Producto</h1>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white">Editar Producto</h1>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
+        <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div className="col-span-2">
               <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-1.5">Nombre del Producto *</label>
               <input 
@@ -673,7 +704,7 @@ export default function EditProductPage() {
             <button 
               type="submit" 
               disabled={saving}
-              className="bg-primary text-white px-8 py-3 rounded-xl font-bold hover:bg-primary/90 disabled:opacity-50 shadow-md hover:shadow-lg transition-all"
+              className="w-full sm:w-auto bg-primary text-white px-8 py-3 rounded-xl font-bold hover:bg-primary/90 disabled:opacity-50 shadow-md hover:shadow-lg transition-all cursor-pointer"
             >
               {saving ? 'Guardando...' : 'Actualizar Producto'}
             </button>
